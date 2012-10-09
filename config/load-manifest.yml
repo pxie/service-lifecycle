@@ -1,0 +1,23 @@
+---
+app:
+  java:
+    :name: java
+    :description: Java 6
+  node08:
+    :name: node08
+    :description: Node.js
+  node06:
+    :name: node06
+    :description: Node.js
+  node:
+    :name: node
+    :description: Node.js
+  ruby18:
+    :name: ruby18
+    :description: Ruby 1.8.7
+  ruby19:
+    :name: ruby19
+    :description: Ruby 1.9.2
+  java7:
+    :name: java7
+    :description: Java 7
