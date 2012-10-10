@@ -37,6 +37,10 @@ service_lifecycle_case_1:
       crequests: 10
       data: 1
       loop: 10
+    import_from_url: true
+    import_from_data: true
+
+  unprovision: false
 
 
 

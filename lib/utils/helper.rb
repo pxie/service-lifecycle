@@ -8,7 +8,7 @@ module Utils
     module_function
 
     def create_users()
-      user_config = YAML.load_file(USERS_CONFIG)
+      @user_config = YAML.load_file(USERS_CONFIG) unless @user_config
 
       start_index   = user_config["startfrom"]
       end_index     = user_config["startfrom"] + user_config["sum"]
@@ -20,7 +20,7 @@ module Utils
 
       user_config["users"] = [] unless user_config["users"]
 
-      client = CFoundry::Client.new("http://api.cf149.dev.las01.vcsops.com")
+      client = CFoundry::Client.new("http://#{user_config["control_domain"]}")
       (start_index...end_index).to_a.each do |index|
         email = "#{prefix}#{index}#{postfix}"
         password = user_config["password"]
@@ -30,5 +30,6 @@ module Utils
       end
       File.open(USERS_CONFIG, "w") { |f| f.write YAML.dump(user_config) }
     end
+
   end
 end

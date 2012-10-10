@@ -64,6 +64,7 @@ put '/service/mysql' do
       end
       sleep(0.1) # ramp up
     end
+    threads.each { |t| t.join }
 
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
