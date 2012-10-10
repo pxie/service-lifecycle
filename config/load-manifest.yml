@@ -1,23 +1,42 @@
 ---
-app:
-  java:
-    :name: java
-    :description: Java 6
-  node08:
-    :name: node08
-    :description: Node.js
-  node06:
-    :name: node06
-    :description: Node.js
-  node:
-    :name: node
-    :description: Node.js
-  ruby18:
-    :name: ruby18
-    :description: Ruby 1.8.7
-  ruby19:
-    :name: ruby19
-    :description: Ruby 1.9.2
-  java7:
-    :name: java7
-    :description: Java 7
+service_lifecycle_case_1:
+  desc: basic service lifecycle stress testing
+  application:
+    name: "worker"
+    framework: "sinatra"
+    runtime: "ruby19"
+    memory: 256
+    services:
+        name: mysql
+        provider: core
+        plan: free
+        version: "5.1"
+
+  cusers: 10
+
+  load:
+    desc: preload some data, data(MB)
+    crequests: 100
+    data: 0.1
+    loop: 10
+
+  take_snapshot:
+    desc: load data and then take snapshot, data(MB)
+    loop: 10
+    load:
+      desc: load data
+      crequests: 10
+      data: 1
+      loop: 10
+
+  rollback:
+    desc: random select one snapshot from take_snapshot session. test import from url and import from data
+    loop: 100
+    load:
+      desc: load data
+      crequests: 10
+      data: 1
+      loop: 10
+
+
+

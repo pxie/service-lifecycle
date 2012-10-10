@@ -30,7 +30,5 @@ module Utils
       end
       File.open(USERS_CONFIG, "w") { |f| f.write YAML.dump(user_config) }
     end
-
-
   end
 end
