@@ -7,6 +7,7 @@ service_lifecycle_case_1:
     runtime: "ruby19"
     memory: 256
     services:
+      tested_inst:
         name: mysql
         provider: core
         plan: free
@@ -14,11 +15,13 @@ service_lifecycle_case_1:
 
   cusers: 10
 
-  load:
+  preload:
     desc: preload some data, data(MB)
-    crequests: 100
-    data: 0.1
-    loop: 10
+    load:
+      crequests: 2
+      data: 0.1
+      loop: 5
+      thinktime: 2
 
   take_snapshot:
     desc: load data and then take snapshot, data(MB)
@@ -28,6 +31,7 @@ service_lifecycle_case_1:
       crequests: 10
       data: 1
       loop: 10
+      thinktime: 2
 
   rollback:
     desc: random select one snapshot from take_snapshot session. test import from url and import from data
@@ -37,6 +41,7 @@ service_lifecycle_case_1:
       crequests: 10
       data: 1
       loop: 10
+      thinktime: 2
     import_from_url: true
     import_from_data: true
 

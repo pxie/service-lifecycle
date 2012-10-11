@@ -1,20 +1,54 @@
 require "cfoundry"
+require "uuidtools"
 
 module Utils
-
   module Action
     module_function
 
+
+
+    ################### HTTP Action ############################
+    def create_datastore(uri, service_name)
+      url = "#{uri}/create/#{service_name}"
+      begin
+        $log.info("create datastore. service: #{service_name}")
+        $log.debug("POST URL: #{url}")
+        response = RestClient.post(url, "", {})
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to create datastore. url: #{url}, service: #{service_name}\n#{e.inspect}")
+      end
+    end
+
+    def load_data(uri, service_name, parameters)
+      path = URI.encode_www_form({"crequests" => parameters["crequests"],
+                                        "data" => parameters["data"],
+                                        "loop" => parameters["loop"],
+                                        "thinktime" => parameters["thinktime"]})
+      url = "#{uri}/service/#{service_name}?#{path}"
+      begin
+        $log.info("Load data to datastore. service: #{service_name}, params: #{parameters}")
+        $log.debug("PUT URL: #{url}")
+        response = RestClient.put(url, "", {})
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to load data. url: #{url}, params#{parameters}\n#{e.inspect}")
+      end
+    end
+
+    ###################  VMC Action ##############################
     def push_app(manifest)
       $log.info("push application, #{manifest}")
       app = @client.app_by_name(manifest["name"])
       path = File.join(File.dirname(__FILE__), "../../app/worker")
+      path = File.absolute_path(path)
       if app
         sync_app(app, path, manifest)
       else
-        create_app(manifest, path)
+        app = create_app(manifest, path)
       end
 
+      app
     end
 
     def login(target, email, password)
@@ -23,8 +57,58 @@ module Utils
         $log.info("login target: #{target}, email: #{email}, password: #{password}")
         @client.login({:username => email, :password => password})
         @client
+        $log.debug("client: #{@client.inspect}")
       rescue Exception => e
         $log.error("Fail to login target: #{target}, email: #{email}, password: #{password}\n#{e.inspect}")
+      end
+    end
+
+    def create_service(instance_name, manifest)
+      services = @client.services
+      services.reject! { |s| s.provider != manifest["provider"] }
+      services.reject! { |s| s.version != manifest["version"] }
+
+      if v2?
+        services.reject! do |s|
+          s.service_plans.none? { |p| p.name == manifest["plan"].upcase }
+        end
+      end
+
+      service = services.first
+
+      instance = @client.service_instance
+      instance.name = instance_name
+
+      if v2?
+        instance.service_plan = service.service_plans.select {|p| p == manifest["plan"]}.first
+        instance.space = @client.current_space
+      else
+        instance.type = service.type
+        instance.vendor = service.label
+        instance.version = service.version
+        instance.tier = manifest["plan"]
+      end
+
+      begin
+        $log.info("create service instance: #{instance_name} (#{service.label} " +
+                      "#{service.version} #{manifest["plan"]} #{manifest["provider"]})")
+        instance.create!
+      rescue Exception => e
+        $log.error("fail to create service instance: #{instance_name} (#{service.label} " +
+                       "#{service.version} #{manifest["plan"]} #{manifest["provider"]})\n#{e.inspect}")
+      end
+
+      instance
+    end
+
+    def bind_service(instance, app)
+      begin
+        $log.info("Binding service: #{instance.name} to application: #{app.name}")
+        unless app.binds?(instance)
+          app.bind(instance)
+        end
+      rescue Exception => e
+        $log.error("fail to bind service: #{instance.name} to application: #{app.name}\n#{e.inspect}")
       end
     end
 
@@ -45,61 +129,36 @@ module Utils
       app.framework = framework
       app.runtime = runtime
 
-      #target_base = @client.target.index(".")
-
-      url =
-          if framework.name == "standalone"
-            if (given = input[:url, "none"]) != "none"
-              given
-            end
-          else
-            input[:url, "#{name}.#{target_base}"]
-          end
-
+      target_base = @client.target.split(".", 2).last
+      uuid = UUIDTools::UUID.random_create.to_s
+      url = "#{manifest["name"]}-#{uuid}.#{target_base}"
       app.urls = [url] if url && !v2?
 
-      default_memory = detector.suggested_memory(framework) || 64
-      app.memory = megabytes(input[:memory, human_mb(default_memory)])
+      app.memory = manifest["memory"]
 
-      app = filter(:create_app, app)
-
-      with_progress("Creating #{c(app.name, :name)}") do
+      begin
+        $log.debug("create application #{app.name}")
         app.create!
+      rescue Exception => e
+        $log.error("fail to create application #{app.name}\n#{e.inspect}")
       end
-
-      invoke :map, :app => app, :url => url if url && v2?
-
-      bindings = []
-
-      if input[:create_services] && !force?
-        while true
-          invoke :create_service, :app => app
-          break unless ask "Create another service?", :default => false
-        end
-      end
-
-      if input[:bind_services] && !force?
-        instances = client.service_instances
-
-        while true
-          invoke :bind_service, :app => app
-
-          break if (instances - app.services).empty?
-
-          break unless ask("Bind another service?", :default => false)
-        end
-      end
-
-      app = filter(:push_app, app)
+      map(app, url) if url && v2?
 
       begin
         upload_app(app, path)
-      rescue
-        err "Upload failed. Try again with 'vmc push'."
-        raise
+      rescue Exception => e
+        $log.error("fail to upload application source. application: #{app.name}, file path: #{path}\n#{e.inspect}")
       end
 
-      invoke :start, :app => app if input[:start]
+      if manifest["services"]
+        manifest["services"].each do |instance_name, details|
+          instance = create_service(instance_name, details)
+          bind_service(instance, app)
+        end
+      end
+
+      start(app)
+      app
     end
 
     def sync_app(app, path, manifest)
@@ -118,14 +177,14 @@ module Utils
         app.total_instances = instances
       end
 
-      all_frameworks = client.frameworks
+      all_frameworks = @client.frameworks
       framework = all_frameworks.select {|f| f.name == manifest["framework"]}.first
       if framework != app.framework
         diff[:framework] = [app.framework.name, framework.name]
         app.framework = framework
       end
 
-      all_runtimes = client.runtimes
+      all_runtimes = @client.runtimes
       runtime = all_runtimes.select {|f| f.name == manifest["runtime"]}.first
       if runtime != app.runtime
         diff[:runtime] = [app.runtime.name, runtime.name]
@@ -163,9 +222,44 @@ module Utils
       restart(app)
     end
 
+    def map(app, url)
+      simple = url.sub(/^https?:\/\/(.*)\/?/i, '\1')
+
+      begin
+        $log.info("bind route: #{url} to application: #{app.name}")
+        if v2?
+          host, domain_name = simple.split(".", 2)
+          $log.debug("map url. host: #{host}, domain_name: #{domain_name}")
+
+          domain =
+              @client.current_space.domains(0, :name => domain_name).first
+          $log.error("invalid domain name") unless domain
+
+          route = @client.routes(0, :host => host).find do |r|
+            r.domain == domain
+          end
+
+          unless route
+            $log.debug("create route.")
+            route = @client.route
+            route.host = host
+            route.domain = domain
+            route.organization = @client.current_organization
+            route.create!
+          end
+          app.add_route(route)
+        else
+          app.urls << simple
+          app.update!
+        end
+      rescue Exception => e
+        $log.error("fail to bind route: #{url} to application: #{app.name}\n#{e.inspect}")
+      end
+    end
+
     def stop(app)
       begin
-        $log.info("stop application #{app.name}")
+        $log.info("stop application: #{app.name}")
         app.stop! unless app.stopped?
       rescue Exception => e
         $log.error("fail to stop application #{app.name}\n#{e.inspect}")
@@ -174,7 +268,7 @@ module Utils
 
     def start(app)
       begin
-        $log.info("start application #{app.name}")
+        $log.info("start application: #{app.name}")
         app.start! unless app.started?
       rescue
         $log.error("fail to start application #{app.name}")

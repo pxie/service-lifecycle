@@ -24,6 +24,7 @@ GEM
     ruby_core_source (0.1.5)
       archive-tar-minitar (>= 0.5.2)
     rubyzip (0.9.9)
+    uuidtools (2.1.2)
 
 PLATFORMS
   ruby
@@ -31,3 +32,4 @@ PLATFORMS
 DEPENDENCIES
   cfoundry (~> 0.3.40)
   ruby-debug19
+  uuidtools

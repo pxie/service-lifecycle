@@ -14,5 +14,9 @@ module Worker
     def sha1sum(data)
       Digest::SHA1.hexdigest(data)
     end
+
+    def think(thinktime)
+      sleep(rand(20) / 20 * thinktime)
+    end
   end
 end
