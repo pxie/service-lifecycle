@@ -5,7 +5,7 @@ service_lifecycle_case_1:
     name: "worker"
     framework: "sinatra"
     runtime: "ruby19"
-    memory: 256
+    memory: 512
     services:
       tested_inst:
         name: mysql

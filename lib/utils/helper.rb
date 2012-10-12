@@ -8,7 +8,7 @@ module Utils
     module_function
 
     def create_users()
-      @user_config = YAML.load_file(USERS_CONFIG) unless @user_config
+      user_config = YAML.load_file(USERS_CONFIG) unless user_config
 
       start_index   = user_config["startfrom"]
       end_index     = user_config["startfrom"] + user_config["sum"]

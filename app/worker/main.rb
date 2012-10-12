@@ -13,87 +13,96 @@ require "json"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
 require "helpers"
+require "tasks"
 include Worker::Helper
+include Worker::Tasks
 
 $log = Logger.new(STDOUT)
 $log.level = Logger::DEBUG
 
-MYSQL_TABLE_NAME =  "data_values"
 
 ############################################################################
-def get_mysql_client
-  mysql_service = load_service('mysql')
-  client = Mysql2::Client.new(:host => mysql_service['hostname'],
-                              :username => mysql_service['user'],
-                              :port => mysql_service['port'],
-                              :password => mysql_service['password'],
-                              :database => mysql_service['name'])
-end
 
-post '/create/mysql' do
-  table = MYSQL_TABLE_NAME
-  client = get_mysql_client
-  result = client.query("SELECT table_name FROM information_schema.tables WHERE table_name = '#{table}'");
-  result = client.query("Create table IF NOT EXISTS #{table} " +
-                   "( id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY, " +
-                   "data LONGTEXT, sha1sum varchar(50)); ") if result.count != 1
-  $log.info("create table: #{table}. result: #{result.inspect}, client: #{client.inspect}")
-  "Create table: #{table} successfully"
-end
-
-put '/service/mysql' do
+post '/createdatastore' do
   begin
-    crequests   = params[:crequests].to_i
-    size        = params[:data].to_f
-    loop        = params[:loop].to_i
-    thinktime   = params[:thinktime].to_f
-
-    $log.info("prepare data")
-    queue = Queue.new
-    loop.times do
-      seed, data = provision_data(size)
-      sha1sum = sha1sum(data)
-      $log.debug("seed: #{seed}, data length: #{data.length}, sha1sum: #{sha1sum}")
-      crequests.times do
-        queue << [seed, sha1sum]
-      end
-    end
-    $log.info("queue size: #{queue.size}")
-
-    threads = []
-    crequests.times do
-      threads << Thread.new do
-        mysql_service = load_service('mysql')
-        client = Mysql2::Client.new(:host => mysql_service['hostname'],
-                                    :username => mysql_service['user'],
-                                    :port => mysql_service['port'],
-                                    :password => mysql_service['password'],
-                                    :database => mysql_service['name'])
-        until queue.empty?
-          seed, sha1sum = queue.pop
-          _, data = provision_data(size, seed)
-          client.query("insert into data_values (data, sha1sum) values('#{data}','#{sha1sum}');")
-          $log.debug("client: #{client.inspect}, insert data: #{seed}, sha1sum: #{sha1sum}")
-          think(thinktime)
-        end
-        $log.debug("close mysql client. client: #{client.inspect}")
-        client.close
-      end
-      sleep(0.1) # ramp up
-    end
-    $log.debug("join threads.")
-    threads.each { |t| t.join }
-
-    client = get_mysql_client
-    result = client.query("select * from #{MYSQL_TABLE_NAME};")
-    result.count.to_json
+    service_name = params[:servicename]
+    name, type = create_datastore(service_name)
+    $log.debug("in createdatastore, name: #{name}, type: #{type}")
+    "Create #{type}: #{name} for #{service_name} successfully"
   rescue Exception => e
-    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
-    $log.error("e: #{e.inspect}")
-    $log.error("at@ #{e.backtrace.join("\n")}")
-    raise RuntimeError, "Fail to insert data to mysql instance\n#{e.inspect}"
+    $log.error("#{e.inspect}, #{e.trace_var}")
   end
+
 end
+
+put '/insertdata' do
+  service_name  = params[:servicename]
+  crequests     = params[:crequests].to_i
+  size          = params[:data].to_f
+  loop          = params[:loop].to_i
+  thinktime     = params[:thinktime].to_f
+
+  record_count  = insert_data(service_name, crequests, size, loop, thinktime)
+  "Insert data successfully, records count: #{record_count}"
+end
+
+post 'takesnapshot' do
+  service_name  = params[:servicename]
+end
+
+#put '/service/mysql' do
+#  begin
+#    crequests   = params[:crequests].to_i
+#    size        = params[:data].to_f
+#    loop        = params[:loop].to_i
+#    thinktime   = params[:thinktime].to_f
+#
+#    $log.info("prepare data")
+#    queue = Queue.new
+#    loop.times do
+#      seed, data = provision_data(size)
+#      sha1sum = sha1sum(data)
+#      $log.debug("seed: #{seed}, data length: #{data.length}, sha1sum: #{sha1sum}")
+#      crequests.times do
+#        queue << [seed, sha1sum]
+#      end
+#    end
+#    $log.info("queue size: #{queue.size}")
+#
+#    threads = []
+#    crequests.times do
+#      threads << Thread.new do
+#        mysql_service = load_service('mysql')
+#        client = Mysql2::Client.new(:host => mysql_service['hostname'],
+#                                    :username => mysql_service['user'],
+#                                    :port => mysql_service['port'],
+#                                    :password => mysql_service['password'],
+#                                    :database => mysql_service['name'])
+#        until queue.empty?
+#          seed, sha1sum = queue.pop
+#          _, data = provision_data(size, seed)
+#          client.query("insert into data_values (data, sha1sum) values('#{data}','#{sha1sum}');")
+#          $log.debug("client: #{client.inspect}, insert data: #{seed}, sha1sum: #{sha1sum}")
+#          think(thinktime)
+#        end
+#        $log.debug("close mysql client. client: #{client.inspect}")
+#        client.close
+#      end
+#      sleep(0.1) # ramp up
+#    end
+#    $log.debug("join threads.")
+#    threads.each { |t| t.join }
+#
+#    client = get_mysql_client
+#    result = client.query("select * from #{MYSQL_TABLE_NAME};")
+#    result.count.to_json
+#  rescue Exception => e
+#    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+#    $log.error("e: #{e.inspect}")
+#    $log.error("at@ #{e.backtrace.join("\n")}")
+#    raise RuntimeError, "Fail to insert data to mysql instance\n#{e.inspect}"
+#  end
+#end
 
 get '/data' do
   case params[:name]

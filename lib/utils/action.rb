@@ -9,7 +9,8 @@ module Utils
 
     ################### HTTP Action ############################
     def create_datastore(uri, service_name)
-      url = "#{uri}/create/#{service_name}"
+      params = URI.encode_www_form({"servicename" => service_name})
+      url = "#{uri}/createdatastore?#{params}"
       begin
         $log.info("create datastore. service: #{service_name}")
         $log.debug("POST URL: #{url}")
@@ -21,11 +22,12 @@ module Utils
     end
 
     def load_data(uri, service_name, parameters)
-      path = URI.encode_www_form({"crequests" => parameters["crequests"],
-                                        "data" => parameters["data"],
-                                        "loop" => parameters["loop"],
-                                        "thinktime" => parameters["thinktime"]})
-      url = "#{uri}/service/#{service_name}?#{path}"
+      path = URI.encode_www_form({"servicename" => service_name,
+                                  "crequests" => parameters["crequests"],
+                                  "data" => parameters["data"],
+                                  "loop" => parameters["loop"],
+                                  "thinktime" => parameters["thinktime"]})
+      url = "#{uri}/insertdata?#{path}"
       begin
         $log.info("Load data to datastore. service: #{service_name}, params: #{parameters}")
         $log.debug("PUT URL: #{url}")
@@ -34,6 +36,18 @@ module Utils
       rescue Exception => e
         $log.error("fail to load data. url: #{url}, params#{parameters}\n#{e.inspect}")
       end
+    end
+
+    def take_snapshot(uri, service_name)
+
+    end
+
+    def list_snapshots(uri, service_name)
+
+    end
+
+    def delete_snapshot(uri, service_name, snapshot)
+
     end
 
     ###################  VMC Action ##############################

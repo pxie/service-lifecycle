@@ -23,8 +23,6 @@ load_config.each do |scenario, details|
   login(target, users[index]["email"], users[index]["password"])
   app = push_app(details["application"])
 
-  #require "ruby-debug"; breakpoint
-
   # preload data
   uri = app.urls.first
   service_name = details["application"]["services"]["tested_inst"]["name"]
