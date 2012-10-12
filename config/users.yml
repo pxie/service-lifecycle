@@ -1,5 +1,5 @@
 --- 
-control_domain: api.cf149.dev.las01.vcsops.com
+control_domain: api.cf87.dev.las01.vcsops.com
 email: service-lifecycle@vmware.com
 password: 123456
 sum: 10
