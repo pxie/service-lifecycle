@@ -4,7 +4,6 @@ require 'json'
 require 'mongo'
 require 'mysql2'
 require 'carrot'
-require 'aws/s3'
 require 'uri'
 require 'pg'
 
@@ -13,32 +12,18 @@ require "json"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
 require "helpers"
+require "actions"
+
 include Worker::Helper
+include Worker::Actions
 
 $log = Logger.new(STDOUT)
 $log.level = Logger::DEBUG
 
-MYSQL_TABLE_NAME =  "data_values"
 
-############################################################################
-def get_mysql_client
-  mysql_service = load_service('mysql')
-  client = Mysql2::Client.new(:host => mysql_service['hostname'],
-                              :username => mysql_service['user'],
-                              :port => mysql_service['port'],
-                              :password => mysql_service['password'],
-                              :database => mysql_service['name'])
-end
-
-post '/create/mysql' do
-  table = MYSQL_TABLE_NAME
-  client = get_mysql_client
-  result = client.query("SELECT table_name FROM information_schema.tables WHERE table_name = '#{table}'");
-  result = client.query("Create table IF NOT EXISTS #{table} " +
-                   "( id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY, " +
-                   "data LONGTEXT, sha1sum varchar(50)); ") if result.count != 1
-  $log.info("create table: #{table}. result: #{result.inspect}, client: #{client.inspect}")
-  "Create table: #{table} successfully"
+post '/createdatastore' do
+  service_name = params[:service]
+  createdatastore(service_name)
 end
 
 put '/service/mysql' do
@@ -49,13 +34,12 @@ put '/service/mysql' do
     thinktime   = params[:thinktime].to_f
 
     $log.info("prepare data")
+    index = 0
     queue = Queue.new
     loop.times do
-      seed, data = provision_data(size)
-      sha1sum = sha1sum(data)
-      $log.debug("seed: #{seed}, data length: #{data.length}, sha1sum: #{sha1sum}")
       crequests.times do
-        queue << [seed, sha1sum]
+        queue << index
+        index += 1
       end
     end
     $log.info("queue size: #{queue.size}")
@@ -63,6 +47,7 @@ put '/service/mysql' do
     threads = []
     crequests.times do
       threads << Thread.new do
+        #client = get_mysql_client
         mysql_service = load_service('mysql')
         client = Mysql2::Client.new(:host => mysql_service['hostname'],
                                     :username => mysql_service['user'],
@@ -70,10 +55,10 @@ put '/service/mysql' do
                                     :password => mysql_service['password'],
                                     :database => mysql_service['name'])
         until queue.empty?
-          seed, sha1sum = queue.pop
-          _, data = provision_data(size, seed)
+          queue.pop
+          data, sha1sum = provision_data(size)
           client.query("insert into data_values (data, sha1sum) values('#{data}','#{sha1sum}');")
-          $log.debug("client: #{client.inspect}, insert data: #{seed}, sha1sum: #{sha1sum}")
+          $log.debug("client: #{client.inspect}, insert data size: #{data.size}, sha1sum: #{sha1sum}")
           think(thinktime)
         end
         $log.debug("close mysql client. client: #{client.inspect}")
