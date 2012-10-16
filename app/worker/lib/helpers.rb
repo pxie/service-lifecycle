@@ -5,7 +5,11 @@ module Worker
     MILLION = 1 * 1024 * 1024
 
     def provision_data(size)
+      raise RuntimeError, "data size cannot be greater than 5 MB" if size > 5
+
       data = Random.new(Time.now.usec).bytes(size * MILLION)
+      # remove specific charactor: \', \"
+      data = data.gsub(/['"]/, "0")
       [data, sha1sum(data)]
     end
 

@@ -1,9 +1,13 @@
+require "helpers"
 
 module Worker
   module Actions
     module_function
 
-    MYSQL_TABLE_NAME =  "data_values"
+    include Worker::Helper
+
+    MYSQL_TABLE_NAME      = "data_values"
+    MYSQL_MAX_BIN_LENGTH  = 5 * 1024 * 1024
 
     def createdatastore(service_name)
       case service_name
@@ -15,15 +19,98 @@ module Worker
 
     end
 
+    def insertdata(service_name, crequests, size, loop, thinktime)
+      $log.info("prepare data")
+      index = 0
+      queue = Queue.new
+      loop.times do
+        crequests.times do
+          queue << index
+          index += 1
+        end
+      end
+      $log.info("queue size: #{queue.size}")
+
+      threads = []
+      crequests.times do
+        threads << Thread.new do
+          client = get_client(service_name)
+
+          until queue.empty?
+            queue.pop
+            data, sha1sum = provision_data(size)
+            $log.debug("provision data, size: #{size}, sha1sum: #{sha1sum}, thread: #{Thread.current.inspect}")
+            do_insert_data(service_name, client, data, sha1sum)
+            think(thinktime)
+          end
+          $log.debug("close client. client: #{client.inspect}")
+          client.close
+        end
+        sleep(0.1) # ramp up
+      end
+      $log.debug("join threads.")
+      threads.each { |t| t.join }
+
+      count = get_total_counts(service_name)
+      {:state => "OK", :count => count}.to_json
+    end
+
+
     private
 
+    ########### common function ###################
+
+    def get_client(service_name)
+      client = nil
+      case service_name
+        when "mysql"
+          client = get_mysql_client
+          $log.debug("get_client. mysql client: #{client.inspect}")
+        else
+          $log.error("invalid service: #{service_name}")
+      end
+      client
+    end
+
+    def do_insert_data(service_name, client, data, sha1sum)
+      case service_name
+        when "mysql"
+          insert_data_to_mysql(client, data, sha1sum)
+        else
+          $log.error("invalid service: #{service_name}")
+      end
+    end
+
+    def get_total_counts(service_name)
+      client = get_client(service_name)
+      counts = do_counts(service_name, client)
+      client.close
+      counts
+    end
+
+    def do_counts(service_name, client)
+      case service_name
+        when "mysql"
+          count_mysql_records(client)
+        else
+          $log.error("invalid service: #{service_name}")
+      end
+    end
+
+
+
+
+
+
+
+    ########## mysql functions ########
     def create_mysql_datastore(table)
       client = get_mysql_client
       $log.debug("create_mysql_datastore. client: #{client.inspect}")
       result = client.query("SELECT table_name FROM information_schema.tables WHERE table_name = '#{table}'");
       result = client.query("Create table IF NOT EXISTS #{table} " +
                                 "( id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY, " +
-                                "data LONGTEXT, sha1sum varchar(50)); ") if result.count != 1
+                                "data VARBINARY(#{MYSQL_MAX_BIN_LENGTH}), sha1sum varchar(50)); ") if result.count != 1
       $log.info("create table: #{table}. result: #{result.inspect}, client: #{client.inspect}")
       client.close
       {:state => "OK", :result => result.inspect, :client => client.inspect}.to_json
@@ -37,6 +124,19 @@ module Worker
                           :password => mysql_service['password'],
                           :database => mysql_service['name'])
     end
+
+    def insert_data_to_mysql(client, data, sha1sum)
+      $log.info("insert data to mysql. client: #{client.inspect}, data size: #{data.size}, sha1sum: #{sha1sum}")
+      client.query("insert into #{MYSQL_TABLE_NAME} (data, sha1sum) values ('#{data}', '#{sha1sum}');")
+    end
+
+    def count_mysql_records(client)
+      result = client.query("select * from #{MYSQL_TABLE_NAME};")
+      $log.debug("count_mysql_records. result: #{result.inspect}, counts: #{result.count}")
+      result.count
+    end
+
+
 
 
   end

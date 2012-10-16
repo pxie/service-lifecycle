@@ -11,10 +11,8 @@ require "logger"
 require "json"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
-require "helpers"
 require "actions"
 
-include Worker::Helper
 include Worker::Actions
 
 $log = Logger.new(STDOUT)
@@ -26,77 +24,16 @@ post '/createdatastore' do
   createdatastore(service_name)
 end
 
-put '/service/mysql' do
-  begin
-    crequests   = params[:crequests].to_i
-    size        = params[:data].to_f
-    loop        = params[:loop].to_i
-    thinktime   = params[:thinktime].to_f
-
-    $log.info("prepare data")
-    index = 0
-    queue = Queue.new
-    loop.times do
-      crequests.times do
-        queue << index
-        index += 1
-      end
-    end
-    $log.info("queue size: #{queue.size}")
-
-    threads = []
-    crequests.times do
-      threads << Thread.new do
-        #client = get_mysql_client
-        mysql_service = load_service('mysql')
-        client = Mysql2::Client.new(:host => mysql_service['hostname'],
-                                    :username => mysql_service['user'],
-                                    :port => mysql_service['port'],
-                                    :password => mysql_service['password'],
-                                    :database => mysql_service['name'])
-        until queue.empty?
-          queue.pop
-          data, sha1sum = provision_data(size)
-          client.query("insert into data_values (data, sha1sum) values('#{data}','#{sha1sum}');")
-          $log.debug("client: #{client.inspect}, insert data size: #{data.size}, sha1sum: #{sha1sum}")
-          think(thinktime)
-        end
-        $log.debug("close mysql client. client: #{client.inspect}")
-        client.close
-      end
-      sleep(0.1) # ramp up
-    end
-    $log.debug("join threads.")
-    threads.each { |t| t.join }
-
-    client = get_mysql_client
-    result = client.query("select * from #{MYSQL_TABLE_NAME};")
-    result.count.to_json
-  rescue Exception => e
-    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
-    $log.error("e: #{e.inspect}")
-    $log.error("at@ #{e.backtrace.join("\n")}")
-    raise RuntimeError, "Fail to insert data to mysql instance\n#{e.inspect}"
-  end
+put '/insertdata' do
+  service_name  = params[:service]
+  crequests     = params[:crequests].to_i
+  size          = params[:size].to_f
+  loop          = params[:loop].to_i
+  thinktime     = params[:thinktime].to_f
+  $log.debug("/insertdata. service: #{service_name}, crequests: #{crequests}," +
+                 " size: #{size}, loop: #{loop}, thinktime: #{thinktime}")
+  insertdata(service_name, crequests, size, loop, thinktime)
 end
-
-get '/data' do
-  case params[:name]
-    when "mysql"
-      mysql_service = load_service('mysql')
-      client = Mysql2::Client.new(:host => mysql_service['hostname'],
-                                  :username => mysql_service['user'],
-                                  :port => mysql_service['port'],
-                                  :password => mysql_service['password'],
-                                  :database => mysql_service['name'])
-      result = client.query("select * from data_values")
-      $log.info("records counts: #{result.size}")
-      result.each do |row|
-        $log.info("row: #{row}")
-      end
-  end
-end
-
 
 #######legacy code##############################################################################
 get '/env' do
