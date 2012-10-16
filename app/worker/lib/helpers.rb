@@ -2,13 +2,11 @@ require 'digest/sha1'
 
 module Worker
   module Helper
-    MILLION = 1 * 1000 * 1000
+    MILLION = 1 * 1024 * 1024
 
-    def provision_data(size, seed = nil)
-      seed = rand(2 ** 32).to_s(36) unless seed
-      size = size * MILLION
-      data = seed * (size / seed.length) + seed[1..(size % seed.length)]
-      [seed, data]
+    def provision_data(size)
+      data = Random.new(Time.now.usec).bytes(size * MILLION)
+      [data, sha1sum(data)]
     end
 
     def sha1sum(data)
