@@ -1,5 +1,6 @@
 require "cfoundry"
 require "uuidtools"
+require "json"
 
 module Utils
   module Action
@@ -12,6 +13,7 @@ module Utils
       path = URI.encode_www_form("service" => service_name)
       url = "#{uri}/createdatastore?#{path}"
       begin
+        puts "create datastore. service: #{service_name}"
         $log.info("create datastore. service: #{service_name}")
         $log.debug("POST URL: #{url}")
         response = RestClient.post(url, "", {})
@@ -22,13 +24,15 @@ module Utils
     end
 
     def load_data(uri, service_name, parameters)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service_name,
                                    "crequests"  => parameters["crequests"],
-                                    "data"      => parameters["data"],
+                                    "size"      => parameters["size"],
                                     "loop"      => parameters["loop"],
                                     "thinktime" => parameters["thinktime"]})
       url = "#{uri}/insertdata?#{path}"
       begin
+        puts "Load data to datastore. service: #{service_name}, params: #{parameters}"
         $log.info("Load data to datastore. service: #{service_name}, params: #{parameters}")
         $log.debug("PUT URL: #{url}")
         response = RestClient.put(url, "", {})
@@ -36,12 +40,118 @@ module Utils
       rescue Exception => e
         $log.error("fail to load data. url: #{url}, params#{parameters}\n#{e.inspect}")
       end
+
+    end
+
+    def take_snapshot(uri, service, header)
+      path = URI.encode_www_form({"service" => service})
+      url = "#{uri}/snapshot/create?#{path}"
+      begin
+        puts "create snaphsot. url: #{url}"
+        $log.info("create snaphsot. url: #{url}, header: #{header}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to create snaphost. url: #{url}, header: #{header}\n#{e.inspect}")
+      end
+    end
+
+    def list_snapshot(uri, service, header, snapshot_id = nil)
+      path = URI.encode_www_form({"service"     => service,
+                                  "snapshotid"  => snapshot_id})
+      url = "#{uri}/snapshot/list?#{path}"
+      begin
+        puts "list snapshot. url: #{url}"
+        $log.info("list snapshot. url: #{url}, header: #{header}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+        response
+      rescue Exception => e
+        $log.error("fail to list snapshot. url: #{url}, header: #{header}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+      end
+    end
+
+    def delete_snapshot(uri, service, header, snapshot_id)
+      path = URI.encode_www_form({"service"     => service,
+                                  "snapshotid"  => snapshot_id})
+      url = "#{uri}/snapshot/delete?#{path}"
+      begin
+        puts "delete snapshot. url: #{url}"
+        $log.info("delete snapshot. url: #{url}, header: #{header}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to delete snapshot. url: #{url}, header: #{header}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+      end
+    end
+
+    def rollback_snapshot(uri, service, header, snapshot_id)
+      path = URI.encode_www_form({"service"     => service,
+                                  "snapshotid"  => snapshot_id})
+      url = "#{uri}/snapshot/rollback?#{path}"
+      begin
+        puts "rollback snapshot. url: #{url}"
+        $log.info("rollback snapshot. url: #{url}, header: #{header}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to rollback snapshot. url: #{url}, header: #{header}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+      end
+    end
+
+    def import_from_data(uri, service, header, snapshot_id)
+      path = URI.encode_www_form({"service"     => service,
+                                  "snapshotid"  => snapshot_id})
+      url = "#{uri}/snapshot/importdata?#{path}"
+      begin
+        puts "import from data. url: #{url}"
+        $log.info("import from data. url: #{url}, header: #{header}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to import from data. url: #{url}, header: #{header}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+      end
+    end
+
+    def import_from_url(uri, service, header, snapshot_id)
+      path = URI.encode_www_form({"service"     => service,
+                                  "snapshotid"  => snapshot_id})
+      url = "#{uri}/snapshot/importurl?#{path}"
+      begin
+        puts "import from url. url: #{url}"
+        $log.info("import from url. url: #{url}, header: #{header}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to import from url. url: #{url}, header: #{header}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+      end
+    end
+
+    def random_snapshot(json_body)
+      snapshots = JSON.parse(json_body)
+      rand = Random.new(Time.now.usec)
+      list = snapshots["snapshots"]
+      index = rand(list.size)
+      snapshot_id = list[index]["snapshot_id"]
+      $log.debug("random select snapshot. snapshot id: #{snapshot_id}")
+      snapshot_id
     end
 
     ###################  VMC Action ##############################
     def push_app(manifest)
+      puts "push application, #{manifest}"
       $log.info("push application, #{manifest}")
-      app = @client.app_by_name(manifest["name"])
+      app = @client.apps.first
       path = File.join(File.dirname(__FILE__), "../../app/worker")
       path = File.absolute_path(path)
       if app
@@ -54,12 +164,13 @@ module Utils
     end
 
     def login(target, email, password)
+      puts "login target: #{target}, email: #{email}, password: #{password}"
       begin
         @client = CFoundry::Client.new(target)
         $log.info("login target: #{target}, email: #{email}, password: #{password}")
-        @client.login({:username => email, :password => password})
-        @client
+        token = @client.login({:username => email, :password => password})
         $log.debug("client: #{@client.inspect}")
+        token
       rescue Exception => e
         $log.error("Fail to login target: #{target}, email: #{email}, password: #{password}\n#{e.inspect}")
       end
@@ -79,7 +190,7 @@ module Utils
       service = services.first
 
       instance = @client.service_instance
-      instance.name = instance_name
+      instance.name = "#{instance_name}-#{@uuid}"
 
       if v2?
         instance.service_plan = service.service_plans.select {|p| p == manifest["plan"]}.first
@@ -91,6 +202,8 @@ module Utils
         instance.tier = manifest["plan"]
       end
 
+      puts "create service instance: #{instance_name} (#{service.label} " +
+               "#{service.version} #{manifest["plan"]} #{manifest["provider"]})"
       begin
         $log.info("create service instance: #{instance_name} (#{service.label} " +
                       "#{service.version} #{manifest["plan"]} #{manifest["provider"]})")
@@ -104,6 +217,7 @@ module Utils
     end
 
     def bind_service(instance, app)
+      puts "Binding service: #{instance.name} to application: #{app.name}"
       begin
         $log.info("Binding service: #{instance.name} to application: #{app.name}")
         unless app.binds?(instance)
@@ -117,8 +231,9 @@ module Utils
     private
 
     def create_app(manifest, path)
+      @uuid ||= UUIDTools::UUID.random_create.to_s
       app = @client.app
-      app.name = manifest["name"]
+      app.name = "#{manifest["name"]}-#{@uuid}"
       app.space = @client.current_space if @client.current_space
       app.total_instances = manifest["instances"] ? manifest["instances"] : 1
       app.production = manifest["plan"] if v2? && manifest["plan"]
@@ -132,8 +247,7 @@ module Utils
       app.runtime = runtime
 
       target_base = @client.target.split(".", 2).last
-      uuid = UUIDTools::UUID.random_create.to_s
-      url = "#{manifest["name"]}-#{uuid}.#{target_base}"
+      url = "#{manifest["name"]}-#{@uuid}.#{target_base}"
       app.urls = [url] if url && !v2?
 
       app.memory = manifest["memory"]

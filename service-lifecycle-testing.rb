@@ -20,10 +20,8 @@ load_config.each do |scenario, details|
   ## start from single thread serial first
   include Utils::Action
   index = 1
-  login(target, users[index]["email"], users[index]["password"])
+  token = login(target, users[index]["email"], users[index]["password"])
   app = push_app(details["application"])
-
-  #require "ruby-debug"; breakpoint
 
   # preload data
   uri = app.urls.first
@@ -31,7 +29,54 @@ load_config.each do |scenario, details|
   create_datastore(uri, service_name)
 
   if s = details["preload"]
-    load_data(uri, service_name, s["load"])
+    s["loop"].times do
+      load_data(uri, service_name, s["load"])
+    end
+  end
+
+  header = {"token"   => token,
+            "target"  => "http://#{target}",
+            "app"     => app.name}
+
+  if s = details["take_snapshot"]
+    s["loop"].times do
+      take_snapshot(uri, service_name, header)
+      load_data(uri, service_name, s["load"])
+    end
+  end
+
+  if s = details["rollback"]
+    s["loop"].times do
+      snapshots = list_snapshot(uri, service_name, header)
+
+      # random select one snapshot
+      snapshot_id = random_snapshot(snapshots)
+      rollback_snapshot(uri, service_name, header, snapshot_id)
+      delete_snapshot(uri, service_name, header, snapshot_id)
+
+      load_data(uri, service_name, s["load"])
+      take_snapshot(uri, service_name, header)
+
+      if s["import_from_url"]
+        snapshots = list_snapshot(uri, service_name, header)
+        snapshot_id = random_snapshot(snapshots)
+
+        import_from_url(uri, service_name, header, snapshot_id)
+        load_data(uri, service_name, s["load"])
+        take_snapshot(uri, service_name, header)
+        delete_snapshot(uri, service_name, header, snapshot_id)
+      end
+
+      if s["import_from_data"]
+        snapshots = list_snapshot(uri, service_name, header)
+        snapshot_id = random_snapshot(snapshots)
+
+        import_from_data(uri, service_name, header, snapshot_id)
+        load_data(uri, service_name, s["load"])
+        take_snapshot(uri, service_name, header)
+        delete_snapshot()
+      end
+    end
   end
 
 

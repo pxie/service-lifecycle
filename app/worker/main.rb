@@ -44,7 +44,7 @@ end
 #create snapshot
 post '/snapshot/create' do
   begin
-    service     = params[:name]
+    service     = params[:service]
     $log.info("service name: #{service}")
 
     parse_header

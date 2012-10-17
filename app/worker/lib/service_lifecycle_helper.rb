@@ -116,10 +116,10 @@ module Worker
 
   def parse_service_id(content, srv_name)
     service_id = nil
-    services = JSON.parse content.body_str
+    services = JSON.parse content
     services.each do |k, v|
       v.each do |srv|
-        if srv["name"] =~ /#{srv_name}/
+        if srv["label"] =~ /#{srv_name}/
           service_id = srv["credentials"]["name"]
           break
         end
@@ -164,6 +164,7 @@ module Worker
     #easy.response_code.should == 200
     resp = easy.body_str
     #resp.should_not == nil
+    $log.info("create snapshot. url: #{url}, hearder: #{auth_headers}, response body: #{easy.body_str}")
     job = JSON.parse(resp)
     job = wait_job(service_id, job["job_id"])
     job

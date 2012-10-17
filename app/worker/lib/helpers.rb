@@ -31,6 +31,7 @@ module Worker
       @session = Worker::CFSession.new(:email => @email,
                                        :passwd => @passwd,
                                        :target => @target)
+      $log.debug("parse header. target: #{@target}, app: #{@app}")
       if @token
         @session.token = @token
         $log.info("token: #{@token}")
@@ -45,7 +46,8 @@ module Worker
     end
 
     def get_service_id(srv_name)
-      content = get_response(:get, '/env')
+      content = ENV['VCAP_SERVICES']
+      $log.debug("get service id. content: #{content}, ")
       service_id = parse_service_id(content, srv_name)
       $log.info("service id: #{service_id}")
       service_id
