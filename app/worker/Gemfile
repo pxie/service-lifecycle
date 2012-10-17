@@ -8,3 +8,5 @@ gem 'json'
 gem 'carrot'
 gem 'pg'
 gem 'aws-s3'
+gem 'curb'
+gem "cfoundry", "~> 0.3.27"

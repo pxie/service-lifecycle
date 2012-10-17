@@ -6,18 +6,24 @@ require 'mysql2'
 require 'carrot'
 require 'uri'
 require 'pg'
+require 'curb'
 
 require "logger"
 require "json"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
 require "actions"
+require "helpers"
+require "service_lifecycle_helper"
 
 include Worker::Actions
+include Worker::Helper
+include Worker::ServiceLifecycleHelper
+
+require "cfsession"
 
 $log = Logger.new(STDOUT)
 $log.level = Logger::DEBUG
-
 
 post '/createdatastore' do
   service_name = params[:service]
@@ -33,6 +39,172 @@ put '/insertdata' do
   $log.debug("/insertdata. service: #{service_name}, crequests: #{crequests}," +
                  " size: #{size}, loop: #{loop}, thinktime: #{thinktime}")
   insertdata(service_name, crequests, size, loop, thinktime)
+end
+
+#create snapshot
+post '/snapshot/create' do
+  begin
+    service     = params[:name]
+    $log.info("service name: #{service}")
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    resp = create_snapshot(service_id)
+
+    resp
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#list snapshots
+post '/snapshot/list' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+    $log.info("service name: #{service}")
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    if snapshot_id==nil
+      resp = get_snapshots(service_id)
+    else
+      resp = get_snapshot(service_id, snapshot_id)
+    end
+    resp
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#rollbak snapshot
+post '/snapshot/rollback' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    resp = rollback_snapshot(service_id, snapshot_id)
+    resp
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#delete snapshot
+post '/snapshot/delete' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    resp = delete_snapshot(service_id, snapshot_id)
+    resp
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#import service from url
+post '/snapshot/importurl' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    serialized_url = create_serialized_url(service_id, snapshot_id)
+    import_url_snapshot_id = import_service_from_url(service_id, serialized_url)
+
+    import_url_snapshot_id
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#import service from data
+post '/snapshot/importdata' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    serialized_url = create_serialized_url(service_id, snapshot_id)
+    serialized_data = download_data(serialized_url)
+    import_data_snapshot_id = import_service_from_data(service_id, serialized_data)
+
+    import_data_snapshot_id
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#get serialized url
+post '/snapshot/serializedurl' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    serialized_url = create_serialized_url(service_id, snapshot_id)
+
+    serialized_url
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+#export data
+post '/snapshot/exportdata' do
+  begin
+    service     = params[:service]
+    snapshot_id = params[:snapshotid]
+
+    parse_header
+    service_id  = get_service_id(service)
+
+    serialized_url = create_serialized_url(service_id, snapshot_id)
+    serialized_data = download_data(serialized_url)
+
+    serialized_data
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
 end
 
 #######legacy code##############################################################################
@@ -320,3 +492,36 @@ def read_from_rabbit(key, client)
   q.ack
   msg
 end
+
+post '/testheader' do
+  begin
+    #env['token']
+    #request[:token]
+    request.port
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+  end
+end
+
+get '/foo' do
+  #status, headers, body = call env.merge("PATH_INFO" => '/bar')
+  #[status, headers, body.map(&:upcase)]
+  #request
+  status 418
+  headers \
+    "Allow"   => "BREW, POST, GET, PROPFIND, WHEN",
+    "Refresh" => "Refresh: 20; http://www.ietf.org/rfc/rfc2324.txt"
+  body "#{request.env}"
+end
+
+get '/bar' do
+  body "#{env['HTTP_TOKEN']}"
+end
+
+get '/foobar' do
+  parse_header
+  @token
+end
+
