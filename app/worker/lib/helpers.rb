@@ -1,4 +1,5 @@
 require 'digest/sha1'
+require "base64"
 
 module Worker
   module Helper
@@ -8,8 +9,8 @@ module Worker
       raise RuntimeError, "data size cannot be greater than 5 MB" if size > 5
 
       data = Random.new(Time.now.usec).bytes(size * MILLION)
-      # remove specific charactor: \', \"
-      data = data.gsub(/['"]/, "0")
+      data = Base64.encode64(data)
+
       [data, sha1sum(data)]
     end
 

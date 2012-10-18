@@ -45,19 +45,36 @@ module Utils
       insert_result(get_service_domain(uri), "Load Data", result)
     end
 
+    def validate_data(uri, service_name)
+      result = "pass"
+      path = URI.encode_www_form({"service"     => service_name})
+      url = "#{uri}/validatedata?#{path}"
+      begin
+        puts "validate data. service: #{service_name}"
+        $log.info("validate data. service: #{service_name}")
+        $log.debug("GET URL: #{url}")
+        response = RestClient.get(url)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+      rescue Exception => e
+        $log.error("fail to validate data. url: #{url}\n#{e.inspect}")
+        result = "fail"
+      end
+      insert_result(get_service_domain(uri), "Validate Data", result)
+    end
+
     def take_snapshot(uri, service, header)
       result = "pass"
       path = URI.encode_www_form({"service" => service})
       url = "#{uri}/snapshot/create?#{path}"
       begin
         puts "create snaphsot. url: #{url}"
-        $log.info("create snaphsot. url: #{url}, header: #{header}")
+        $log.info("create snaphsot. url: #{url}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
         resp = JSON.parse(response.body)
         result = "fail" if resp["status"] == "failed"
       rescue Exception => e
-        $log.error("fail to create snaphost. url: #{url}, header: #{header}\n#{e.inspect}")
+        $log.error("fail to create snaphost. url: #{url}\n#{e.inspect}")
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Take Snapshot", result)
@@ -73,8 +90,16 @@ module Utils
         puts "list snapshot. url: #{url}"
         $log.info("list snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
-        response = RestClient.post(url, "", header)
-        $log.debug("response: #{response.code}, body: #{response.body}")
+        timeout = 10
+        sleep_time = 1
+        while timeout > 0
+          sleep(sleep_time)
+          timeout -= sleep_time
+
+          response = RestClient.post(url, "", header)
+          $log.debug("response: #{response.code}, body: #{response.body}")
+          break if response.code == 200 && has_snapshot?(response.body)
+        end
       rescue Exception => e
         $log.error("fail to list snapshot. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
@@ -240,6 +265,7 @@ module Utils
     end
 
     def cleanup(client)
+      $log.debug("cleanup all applications and services")
       client.service_instances.each { |s| s.delete! }
       client.apps.each { |app| app.delete! }
     end
@@ -455,5 +481,9 @@ module Utils
       uri.split(".").first
     end
 
+    def has_snapshot?(json_body)
+      snapshots = JSON.parse(json_body)
+      !snapshots["snapshots"].empty?
+    end
   end
 end

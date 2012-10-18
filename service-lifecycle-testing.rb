@@ -2,6 +2,7 @@ require "logger"
 require "cfoundry"
 require "restclient"
 require "uri"
+require "vcap/logging"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
 require "utils"
@@ -13,7 +14,13 @@ user_config = YAML.load_file(Utils::USERS_CONFIG)
 target = user_config["control_domain"]
 users = user_config["users"]
 
-$log = Logger.new('testing.log', 'daily')
+logfile     = "testing.log"
+loglevel    = :debug
+config = {:level => loglevel, :file => logfile}
+VCAP::Logging.setup_from_config(config)
+$log = VCAP::Logging.logger(File.basename($0))
+
+#$log = Logger.new('testing.log', 'daily')
 Utils::Results.create_db
 
 #load_config.each do |scenario, details|
@@ -91,7 +98,6 @@ load_config.each do |scenario, details|
   threads = []
   details["cusers"].times do |index|
     threads << Thread.new do
-      $log.info("start to test scenario #{scenario}")
 
       ## start from single thread serial first
       include Utils::Action
@@ -134,6 +140,7 @@ load_config.each do |scenario, details|
           # random select one snapshot
           snapshot_id = random_snapshot(snapshots)
           rollback_snapshot(uri, service_name, header, snapshot_id)
+          validate_data(uri, service_name)
           delete_snapshot(uri, service_name, header, snapshot_id)
 
           load_data(uri, service_name, s["load"])
@@ -145,6 +152,7 @@ load_config.each do |scenario, details|
 
             import_from_url(uri, service_name, header, snapshot_id)
             load_data(uri, service_name, s["load"])
+            validate_data(uri, service_name)
             take_snapshot(uri, service_name, header)
             delete_snapshot(uri, service_name, header, snapshot_id)
           end
@@ -155,6 +163,7 @@ load_config.each do |scenario, details|
 
             import_from_data(uri, service_name, header, snapshot_id)
             load_data(uri, service_name, s["load"])
+            validate_data(uri, service_name)
             take_snapshot(uri, service_name, header)
             delete_snapshot(uri, service_name, header, snapshot_id)
           end
@@ -164,6 +173,7 @@ load_config.each do |scenario, details|
     sleep(1)
   end
   threads.each { |t| t.join }
+  puts "prepare results"
   print_result
 end
 

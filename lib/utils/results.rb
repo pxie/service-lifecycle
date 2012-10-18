@@ -24,14 +24,18 @@ module Utils
     end
 
     def print_result()
-      require "ruby-debug"; breakpoint
       puts "\tOperation\t\tError Rate\t\n"
+      $log.info("Operation,Error Rate")
       ops = $db.execute("select op from #{RESULTS_TABLE} group by op")
       $log.debug("SQL: select op from #{RESULTS_TABLE} group by op, result: #{ops.inspect}")
       ops.each do |op|
-        failures = $db.execute("select count(op) from #{RESULTS_TABLE} where op = #{op} and result = 'fail'")
-        total = $db.execute("select count(op) from #{RESULTS_TABLE} where op = #{op}")
-        puts "\t#{op}\t\t#{failures/total * 100}%\t\n"
+        op = op.first
+        failures = $db.execute("select count(op) from #{RESULTS_TABLE} where op = '#{op}' and result = 'fail'").first.first
+        $log.debug("failures: #{failures.class}, #{failures.inspect}")
+        total = $db.execute("select count(op) from #{RESULTS_TABLE} where op = '#{op}'").first.first
+        $log.debug("total: #{total.class}, #{total.inspect}")
+        puts "\t#{op}\t\t#{failures * 100.0 / total}%\t\n"
+        $log.info("#{op},#{failures * 100.0 / total}%")
       end
 
     end

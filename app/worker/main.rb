@@ -41,6 +41,11 @@ put '/insertdata' do
   insertdata(service_name, crequests, size, loop, thinktime)
 end
 
+get '/validatedata' do
+  service_name = params[:service]
+  validatedata(service_name)
+end
+
 #create snapshot
 post '/snapshot/create' do
   begin
