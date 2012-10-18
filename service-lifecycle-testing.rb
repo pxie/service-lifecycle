@@ -124,14 +124,16 @@ load_config.each do |scenario, details|
                 "app"     => app.name}
 
       if s = details["take_snapshot"]
-        s["loop"].times do
+        s["loop"].times do |index|
+          $log.info("Take snapshot job. index: #{index}")
           take_snapshot(uri, service_name, header)
           load_data(uri, service_name, s["load"])
         end
       end
 
       if s = details["rollback"]
-        s["loop"].times do
+        s["loop"].times do  |index|
+          $log.info("Rollback snapshot job. index: #{index}")
           snapshots = list_snapshot(uri, service_name, header)
 
           unless snapshots
