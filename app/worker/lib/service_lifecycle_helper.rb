@@ -35,7 +35,7 @@ module Worker
 
     resp = easy.body_str
     #resp.should_not == nil
-    JSON.parse(resp)
+    #JSON.parse(resp)
 
     resp
   end
@@ -67,7 +67,7 @@ module Worker
       #c.response_code.should == 200
     end
     File.open(temp_file.path) do |f|
-      #f.size.should > 0
+      $log.debug("serialized data size: #{f.size / 1024 / 1024}MB")#f.size.should > 0
     end
     serialized_data_file = temp_file
   end
@@ -136,10 +136,11 @@ module Worker
 
     #easy.response_code.should == 200
     resp = easy.body_str
+    $log.debug("create serialized url. response: #{resp.inspect}")
     #resp.should_not == nil
     job = JSON.parse(resp)
     job = wait_job(service_id,job["job_id"])
-    #job["result"]["url"].should_not == nil
+    job = JSON.parse(job)
     job["result"]["url"]
   end
 
@@ -165,9 +166,10 @@ module Worker
     resp = easy.body_str
     #resp.should_not == nil
     $log.info("create snapshot. url: #{url}, hearder: #{auth_headers}, response body: #{easy.body_str}")
-    job = JSON.parse(resp)
-    job = wait_job(service_id, job["job_id"])
-    job
+    resp
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id, job["job_id"])
+    #job
   end
 
   def get_snapshot(service_id, snapshot_id)
@@ -220,14 +222,14 @@ module Worker
   end
 
   def wait_job(service_id, job_id)
-    timeout = 8
+    timeout = 180
     sleep_time = 1
     while timeout > 0
       sleep sleep_time
       timeout -= sleep_time
 
       job = get_job(service_id, job_id)
-      return job.to_s if job_completed?(job)
+      return job.to_json if job_completed?(job)
     end
     # failed
     raise "Time out"
@@ -240,6 +242,7 @@ module Worker
     easy.http_get
 
     resp = easy.body_str
+    $log.debug("get job. response: #{resp.inspect}")
     #resp.should_not == nil
     JSON.parse(resp)
   end

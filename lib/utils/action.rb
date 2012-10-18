@@ -1,12 +1,13 @@
 require "cfoundry"
 require "uuidtools"
 require "json"
+require "utils/results"
 
 module Utils
   module Action
     module_function
 
-
+    include Utils::Results
 
     ################### HTTP Action ############################
     def create_datastore(uri, service_name)
@@ -39,11 +40,13 @@ module Utils
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
         $log.error("fail to load data. url: #{url}, params#{parameters}\n#{e.inspect}")
+        result = "fail"
       end
-
+      insert_result(get_service_domain(uri), "Load Data", result)
     end
 
     def take_snapshot(uri, service, header)
+      result = "pass"
       path = URI.encode_www_form({"service" => service})
       url = "#{uri}/snapshot/create?#{path}"
       begin
@@ -51,90 +54,110 @@ module Utils
         $log.info("create snaphsot. url: #{url}, header: #{header}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
+        resp = JSON.parse(response.body)
+        result = "fail" if resp["status"] == "failed"
       rescue Exception => e
         $log.error("fail to create snaphost. url: #{url}, header: #{header}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Take Snapshot", result)
+      response
     end
 
     def list_snapshot(uri, service, header, snapshot_id = nil)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/list?#{path}"
       begin
         puts "list snapshot. url: #{url}"
-        $log.info("list snapshot. url: #{url}, header: #{header}, service: #{service}," +
+        $log.info("list snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
-        response
       rescue Exception => e
-        $log.error("fail to list snapshot. url: #{url}, header: #{header}, "+
+        $log.error("fail to list snapshot. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Take Snapshot", result)
+      response
     end
 
     def delete_snapshot(uri, service, header, snapshot_id)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/delete?#{path}"
       begin
         puts "delete snapshot. url: #{url}"
-        $log.info("delete snapshot. url: #{url}, header: #{header}, service: #{service}," +
+        $log.info("delete snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
-        $log.error("fail to delete snapshot. url: #{url}, header: #{header}, "+
+        $log.error("fail to delete snapshot. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Delete Snapshot", result)
     end
 
     def rollback_snapshot(uri, service, header, snapshot_id)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/rollback?#{path}"
       begin
         puts "rollback snapshot. url: #{url}"
-        $log.info("rollback snapshot. url: #{url}, header: #{header}, service: #{service}," +
+        $log.info("rollback snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
-        $log.error("fail to rollback snapshot. url: #{url}, header: #{header}, "+
+        $log.error("fail to rollback snapshot. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Rollback Snapshot", result)
     end
 
     def import_from_data(uri, service, header, snapshot_id)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/importdata?#{path}"
       begin
         puts "import from data. url: #{url}"
-        $log.info("import from data. url: #{url}, header: #{header}, service: #{service}," +
+        $log.info("import from data. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
-        $log.error("fail to import from data. url: #{url}, header: #{header}, "+
+        $log.error("fail to import from data. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Import from Data", result)
     end
 
     def import_from_url(uri, service, header, snapshot_id)
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/importurl?#{path}"
       begin
         puts "import from url. url: #{url}"
-        $log.info("import from url. url: #{url}, header: #{header}, service: #{service}," +
+        $log.info("import from url. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
-        $log.error("fail to import from url. url: #{url}, header: #{header}, "+
+        $log.error("fail to import from url. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
       end
+      insert_result(get_service_domain(uri), "Import from URL", result)
     end
 
     def random_snapshot(json_body)
@@ -148,16 +171,16 @@ module Utils
     end
 
     ###################  VMC Action ##############################
-    def push_app(manifest)
+    def push_app(manifest, client)
       puts "push application, #{manifest}"
       $log.info("push application, #{manifest}")
-      app = @client.apps.first
+      app = client.apps.first
       path = File.join(File.dirname(__FILE__), "../../app/worker")
       path = File.absolute_path(path)
       if app
-        sync_app(app, path, manifest)
+        sync_app(app, path, manifest, client)
       else
-        app = create_app(manifest, path)
+        app = create_app(manifest, path, client)
       end
 
       app
@@ -166,22 +189,22 @@ module Utils
     def login(target, email, password)
       puts "login target: #{target}, email: #{email}, password: #{password}"
       begin
-        @client = CFoundry::Client.new(target)
+        client = CFoundry::Client.new(target)
         $log.info("login target: #{target}, email: #{email}, password: #{password}")
-        token = @client.login({:username => email, :password => password})
-        $log.debug("client: #{@client.inspect}")
-        token
+        token = client.login({:username => email, :password => password})
+        $log.debug("client: #{client.inspect}")
+        [token, client]
       rescue Exception => e
         $log.error("Fail to login target: #{target}, email: #{email}, password: #{password}\n#{e.inspect}")
       end
     end
 
-    def create_service(instance_name, manifest)
-      services = @client.services
+    def create_service(instance_name, manifest, client, uuid)
+      services = client.services
       services.reject! { |s| s.provider != manifest["provider"] }
       services.reject! { |s| s.version != manifest["version"] }
 
-      if v2?
+      if v2?(client)
         services.reject! do |s|
           s.service_plans.none? { |p| p.name == manifest["plan"].upcase }
         end
@@ -189,12 +212,12 @@ module Utils
 
       service = services.first
 
-      instance = @client.service_instance
-      instance.name = "#{instance_name}-#{@uuid}"
+      instance = client.service_instance
+      instance.name = "#{instance_name}-#{uuid}"
 
-      if v2?
+      if v2?(client)
         instance.service_plan = service.service_plans.select {|p| p == manifest["plan"]}.first
-        instance.space = @client.current_space
+        instance.space = client.current_space
       else
         instance.type = service.type
         instance.vendor = service.label
@@ -216,6 +239,11 @@ module Utils
       instance
     end
 
+    def cleanup(client)
+      client.service_instances.each { |s| s.delete! }
+      client.apps.each { |app| app.delete! }
+    end
+
     def bind_service(instance, app)
       puts "Binding service: #{instance.name} to application: #{app.name}"
       begin
@@ -230,25 +258,25 @@ module Utils
 
     private
 
-    def create_app(manifest, path)
-      @uuid ||= UUIDTools::UUID.random_create.to_s
-      app = @client.app
-      app.name = "#{manifest["name"]}-#{@uuid}"
-      app.space = @client.current_space if @client.current_space
+    def create_app(manifest, path, client)
+      uuid = UUIDTools::UUID.random_create.to_s
+      app = client.app
+      app.name = "#{manifest["name"]}-#{uuid}"
+      app.space = client.current_space if client.current_space
       app.total_instances = manifest["instances"] ? manifest["instances"] : 1
-      app.production = manifest["plan"] if v2? && manifest["plan"]
+      app.production = manifest["plan"] if v2?(client) && manifest["plan"]
 
-      all_frameworks = @client.frameworks
-      all_runtimes = @client.runtimes
+      all_frameworks = client.frameworks
+      all_runtimes = client.runtimes
       framework = all_frameworks.select {|f| f.name == manifest["framework"]}.first
       runtime = all_runtimes.select {|f| f.name == manifest["runtime"]}.first
 
       app.framework = framework
       app.runtime = runtime
 
-      target_base = @client.target.split(".", 2).last
-      url = "#{manifest["name"]}-#{@uuid}.#{target_base}"
-      app.urls = [url] if url && !v2?
+      target_base = client.target.split(".", 2).last
+      url = "#{manifest["name"]}-#{uuid}.#{target_base}"
+      app.urls = [url] if url && !v2?(client)
 
       app.memory = manifest["memory"]
 
@@ -258,7 +286,7 @@ module Utils
       rescue Exception => e
         $log.error("fail to create application #{app.name}\n#{e.inspect}")
       end
-      map(app, url) if url && v2?
+      map(app, url) if url && v2?(client)
 
       begin
         upload_app(app, path)
@@ -268,7 +296,7 @@ module Utils
 
       if manifest["services"]
         manifest["services"].each do |instance_name, details|
-          instance = create_service(instance_name, details)
+          instance = create_service(instance_name, details, client, uuid)
           bind_service(instance, app)
         end
       end
@@ -277,7 +305,7 @@ module Utils
       app
     end
 
-    def sync_app(app, path, manifest)
+    def sync_app(app, path, manifest, client)
       upload_app(app, path)
 
       diff = {}
@@ -293,14 +321,14 @@ module Utils
         app.total_instances = instances
       end
 
-      all_frameworks = @client.frameworks
+      all_frameworks = client.frameworks
       framework = all_frameworks.select {|f| f.name == manifest["framework"]}.first
       if framework != app.framework
         diff[:framework] = [app.framework.name, framework.name]
         app.framework = framework
       end
 
-      all_runtimes = @client.runtimes
+      all_runtimes = client.runtimes
       runtime = all_runtimes.select {|f| f.name == manifest["runtime"]}.first
       if runtime != app.runtime
         diff[:runtime] = [app.runtime.name, runtime.name]
@@ -316,7 +344,7 @@ module Utils
         end
       end
 
-      if manifest["plan"] && v2?
+      if manifest["plan"] && v2?(client)
         production = manifest["plan"]
 
         if production != app.production
@@ -343,24 +371,24 @@ module Utils
 
       begin
         $log.info("bind route: #{url} to application: #{app.name}")
-        if v2?
+        if v2?(client)
           host, domain_name = simple.split(".", 2)
           $log.debug("map url. host: #{host}, domain_name: #{domain_name}")
 
           domain =
-              @client.current_space.domains(0, :name => domain_name).first
+              client.current_space.domains(0, :name => domain_name).first
           $log.error("invalid domain name") unless domain
 
-          route = @client.routes(0, :host => host).find do |r|
+          route = client.routes(0, :host => host).find do |r|
             r.domain == domain
           end
 
           unless route
             $log.debug("create route.")
-            route = @client.route
+            route = client.route
             route.host = host
             route.domain = domain
-            route.organization = @client.current_organization
+            route.organization = client.current_organization
             route.create!
           end
           app.add_route(route)
@@ -419,8 +447,12 @@ module Utils
       end
     end
 
-    def v2?
-      @client.is_a?(CFoundry::V2::Client)
+    def v2?(client)
+      client.is_a?(CFoundry::V2::Client)
+    end
+
+    def get_service_domain(uri)
+      uri.split(".").first
     end
 
   end

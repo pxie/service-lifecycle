@@ -49,7 +49,25 @@ post '/snapshot/create' do
 
     parse_header
     service_id  = get_service_id(service)
+    resp = create_snapshot(service_id)
 
+    resp
+  rescue Exception => e
+    $log.error("*** FATAL UNHANDLED EXCEPTION ***")
+    $log.error("e: #{e.inspect}")
+    $log.error("at@ #{e.backtrace.join("\n")}")
+    raise e
+  end
+end
+
+# get job status
+get '/snapshot/queryjobstatus' do
+  begin
+    service     = params[:service]
+    $log.info("service name: #{service}")
+
+    parse_header
+    service_id  = get_service_id(service)
     resp = create_snapshot(service_id)
 
     resp
@@ -114,7 +132,7 @@ post '/snapshot/delete' do
     service_id  = get_service_id(service)
 
     resp = delete_snapshot(service_id, snapshot_id)
-    resp
+    resp.to_json
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
     $log.error("e: #{e.inspect}")
@@ -154,6 +172,7 @@ post '/snapshot/importdata' do
     service_id  = get_service_id(service)
 
     serialized_url = create_serialized_url(service_id, snapshot_id)
+    $log.debug("import data. serialized_url: #{serialized_url}")
     serialized_data = download_data(serialized_url)
     import_data_snapshot_id = import_service_from_data(service_id, serialized_data)
 

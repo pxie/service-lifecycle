@@ -25,5 +25,3 @@ users:
   password: 123456
 - email: service-lifecycle9@vmware.com
   password: 123456
-- email: service-lifecycle10@vmware.com
-  password: 123456
