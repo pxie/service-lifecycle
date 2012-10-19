@@ -90,7 +90,7 @@ module Utils
         puts "list snapshot. url: #{url}"
         $log.info("list snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
-        timeout = 10 * 60 # wait 10 mins
+        timeout = 30 * 60 # wait 30 mins
         sleep_time = 1
         while timeout > 0
           sleep(sleep_time)

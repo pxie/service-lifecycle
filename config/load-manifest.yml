@@ -13,7 +13,7 @@ service_lifecycle_case_1:
         plan: free
         version: "5.1"
 
-  cusers: 1
+  cusers: 2
 
   preload:
     desc: preload some data, size(MB), max size is 5 MB
@@ -22,7 +22,7 @@ service_lifecycle_case_1:
       crequests: 5
       size: 0.02
       loop: 2
-      thinktime: 0.2
+      thinktime: 1
 
   take_snapshot:
     desc: load data and then take snapshot, data(MB)
@@ -32,7 +32,7 @@ service_lifecycle_case_1:
       crequests: 10
       size: 0.1
       loop: 3
-      thinktime: 0.2
+      thinktime: 2
 
   rollback:
     desc: random select one snapshot from take_snapshot session. test import from url and import from data
@@ -42,9 +42,9 @@ service_lifecycle_case_1:
       crequests: 3
       size: 0.3
       loop: 10
-      thinktime: 0.2
-    import_from_url: false
-    import_from_data: false
+      thinktime: 2
+    import_from_url: true
+    import_from_data: true
 
   unprovision: false
 
