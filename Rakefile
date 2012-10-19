@@ -6,7 +6,7 @@ task :cleanup do
   include Utils::Action
   user_config = YAML.load_file(Utils::USERS_CONFIG)
   user_config["users"].each do |user|
-    client = login(user_config["control_domain"], user["email"], user["password"])
+    _, client = login(user_config["control_domain"], user["email"], user["password"])
     cleanup(client)
   end
 end
@@ -17,7 +17,7 @@ task :createusers do
 end
 
 desc "run tests"
-task :runtests do
+task :tests do
   sh('ruby service-lifecycle-testing.rb')
 end
 

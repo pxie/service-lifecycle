@@ -2,7 +2,6 @@ require "logger"
 require "cfoundry"
 require "restclient"
 require "uri"
-require "vcap/logging"
 
 $:.unshift(File.join(File.dirname(__FILE__), "lib"))
 require "utils"
@@ -14,11 +13,7 @@ user_config = YAML.load_file(Utils::USERS_CONFIG)
 target = user_config["control_domain"]
 users = user_config["users"]
 
-logfile     = "testing.log"
-loglevel    = :debug
-config = {:level => loglevel, :file => logfile}
-VCAP::Logging.setup_from_config(config)
-$log = VCAP::Logging.logger(File.basename($0))
+
 
 #$log = Logger.new('testing.log', 'daily')
 Utils::Results.create_db

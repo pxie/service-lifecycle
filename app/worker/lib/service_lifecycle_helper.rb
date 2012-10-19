@@ -221,7 +221,7 @@ module Worker
   end
 
   def wait_job(service_id, job_id)
-    timeout = 180
+    timeout = 10 * 60
     sleep_time = 1
     while timeout > 0
       sleep sleep_time

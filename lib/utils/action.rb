@@ -2,12 +2,19 @@ require "cfoundry"
 require "uuidtools"
 require "json"
 require "utils/results"
+require "vcap/logging"
 
 module Utils
   module Action
     module_function
 
     include Utils::Results
+
+    logfile     = "testing.log"
+    loglevel    = :debug
+    config = {:level => loglevel, :file => logfile}
+    VCAP::Logging.setup_from_config(config)
+    $log = VCAP::Logging.logger(File.basename($0))
 
     def think(thinktime)
       rand = Random.new
@@ -168,6 +175,8 @@ module Utils
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
+        resp = JSON.parse(response.body)
+        result = "fail" if resp["status"] == "failed"
       rescue Exception => e
         $log.error("fail to import from data. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
