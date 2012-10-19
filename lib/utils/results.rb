@@ -34,8 +34,15 @@ module Utils
         $log.debug("failures: #{failures.class}, #{failures.inspect}")
         total = $db.execute("select count(op) from #{RESULTS_TABLE} where op = '#{op}'").first.first
         $log.debug("total: #{total.class}, #{total.inspect}")
-        puts "\t#{op}\t\t#{failures * 100.0 / total}%\t\n"
-        $log.info("#{op},#{failures * 100.0 / total}%")
+        if total > 0
+          puts "\t#{op}\t\t#{failures}/#{total} (#{failures * 100.0 / total}%)\t\n"
+          $log.info("\t#{op}\t\t#{failures}/#{total} (#{failures * 100.0 / total}%)\t")
+
+        else
+          puts "\t#{op}\t\t#{failures}/#{total} (0.0%)\t\n"
+          $log.info("\t#{op}\t\t#{failures}/#{total} (0.0%)\t")
+        end
+
       end
 
     end

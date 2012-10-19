@@ -90,7 +90,7 @@ module Utils
         puts "list snapshot. url: #{url}"
         $log.info("list snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
-        timeout = 10
+        timeout = 10 * 60 # wait 10 mins
         sleep_time = 1
         while timeout > 0
           sleep(sleep_time)
@@ -106,7 +106,12 @@ module Utils
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Take Snapshot", result)
-      response
+      response.body
+    end
+
+    def has_snapshot?(json_body)
+      snapshots = JSON.parse(json_body)
+      !snapshots["snapshots"].empty?
     end
 
     def delete_snapshot(uri, service, header, snapshot_id)
@@ -481,9 +486,5 @@ module Utils
       uri.split(".").first
     end
 
-    def has_snapshot?(json_body)
-      snapshots = JSON.parse(json_body)
-      !snapshots["snapshots"].empty?
-    end
   end
 end
