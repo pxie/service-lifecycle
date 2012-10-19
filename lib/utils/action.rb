@@ -102,7 +102,7 @@ module Utils
         puts "list snapshot. url: #{url}"
         $log.info("list snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
-        timeout = 30 * 60 # wait 30 mins
+        timeout = 5 * 60 * 60 # wait 30 mins
         sleep_time = 1
         while timeout > 0
           sleep(sleep_time)
@@ -119,6 +119,37 @@ module Utils
       end
       insert_result(get_service_domain(uri), "Take Snapshot", result)
       response.body
+    end
+
+    def validate_snapshot(uri, service, header, totalnum)
+      result = "pass"
+      path = URI.encode_www_form({"service"     => service})
+      url = "#{uri}/snapshot/list?#{path}"
+      begin
+        puts "validate snapshot. url: #{url}"
+        $log.info("validate snapshot. url: #{url}, service: #{service}")
+        timeout = 5 * 60 * 60 # wait 5 hrs
+        sleep_time = 1
+        while timeout > 0
+          sleep(sleep_time)
+          timeout -= sleep_time
+
+          response = RestClient.post(url, "", header)
+          $log.debug("response: #{response.code}, body: #{response.body}")
+          if response.code == 200
+            snapshots = JSON.parse(response.body)
+            $log.debug("snapshots length: #{snapshots["snapshots"].length}, totalnum: #{totalnum}")
+            break if snapshots["snapshots"].length >= totalnum
+          end
+        end
+        result = "fail" unless timeout > 0
+      rescue Exception => e
+        $log.error("fail to list snapshot. url: #{url}, "+
+                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        result = "fail"
+      end
+      insert_result(get_service_domain(uri), "Validate snapshot", result)
+      result == "pass" ? true : false
     end
 
     def has_snapshot?(json_body)

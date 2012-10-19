@@ -55,7 +55,7 @@ module Worker
           $log.debug("close client. client: #{client.inspect}")
           client.close
         end
-        sleep(0.1) # ramp up
+        sleep(1) # ramp up
       end
       $log.debug("join threads.")
       threads.each { |t| t.join }

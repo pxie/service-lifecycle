@@ -61,48 +61,50 @@ load_config.each do |scenario, details|
 
       if s = details["rollback"]
         s["loop"].times do  |index|
-          $log.info("Rollback snapshot job. index: #{index}")
-          snapshots = list_snapshot(uri, service_name, header)
+          if validate_snapshot(uri, service_name, header, details["take_snapshot"]["loop"])
+            $log.info("Rollback snapshot job. index: #{index}")
+            snapshots = list_snapshot(uri, service_name, header)
 
-          if has_snapshot?(snapshots)
-            # random select one snapshot
-            snapshot_id = random_snapshot(snapshots)
-            rollback_snapshot(uri, service_name, header, snapshot_id)
-            validate_data(uri, service_name)
-            delete_snapshot(uri, service_name, header, snapshot_id)
-
-            load_data(uri, service_name, s["load"])
-            take_snapshot(uri, service_name, header)
-            think(s["thinktime"])
-
-            if s["import_from_url"]
-              snapshots = list_snapshot(uri, service_name, header)
+            if has_snapshot?(snapshots)
+              # random select one snapshot
               snapshot_id = random_snapshot(snapshots)
-
-              import_from_url(uri, service_name, header, snapshot_id)
-              load_data(uri, service_name, s["load"])
+              rollback_snapshot(uri, service_name, header, snapshot_id)
               validate_data(uri, service_name)
-              take_snapshot(uri, service_name, header)
               delete_snapshot(uri, service_name, header, snapshot_id)
-              think(s["thinktime"])
-            end
 
-            if s["import_from_data"]
-              snapshots = list_snapshot(uri, service_name, header)
-              snapshot_id = random_snapshot(snapshots)
-
-              import_from_data(uri, service_name, header, snapshot_id)
               load_data(uri, service_name, s["load"])
-              validate_data(uri, service_name)
               take_snapshot(uri, service_name, header)
-              delete_snapshot(uri, service_name, header, snapshot_id)
               think(s["thinktime"])
+
+              if s["import_from_url"]
+                snapshots = list_snapshot(uri, service_name, header)
+                snapshot_id = random_snapshot(snapshots)
+
+                import_from_url(uri, service_name, header, snapshot_id)
+                load_data(uri, service_name, s["load"])
+                validate_data(uri, service_name)
+                take_snapshot(uri, service_name, header)
+                delete_snapshot(uri, service_name, header, snapshot_id)
+                think(s["thinktime"])
+              end
+
+              if s["import_from_data"]
+                snapshots = list_snapshot(uri, service_name, header)
+                snapshot_id = random_snapshot(snapshots)
+
+                import_from_data(uri, service_name, header, snapshot_id)
+                load_data(uri, service_name, s["load"])
+                validate_data(uri, service_name)
+                take_snapshot(uri, service_name, header)
+                delete_snapshot(uri, service_name, header, snapshot_id)
+                think(s["thinktime"])
+              end
             end
           end
         end
       end
     end
-    sleep(1)
+    sleep(2)
   end
   threads.each { |t| t.join }
   puts "prepare results"

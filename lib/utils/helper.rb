@@ -20,6 +20,7 @@ module Utils
 
       @user_config["users"] = [] unless @user_config["users"]
 
+      puts "http://#{@user_config["control_domain"]}"
       client = CFoundry::Client.new("http://#{@user_config["control_domain"]}")
       (start_index...end_index).to_a.each do |index|
         email = "#{prefix}#{index}#{postfix}"
