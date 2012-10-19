@@ -18,31 +18,34 @@ service_lifecycle_case_1:
   preload:
     desc: preload some data, size(MB), max size is 5 MB
     loop: 1
+    thinktime: 5
     load:
       crequests: 5
       size: 0.02
       loop: 2
-      thinktime: 1
+      thinktime: 5
 
   take_snapshot:
     desc: load data and then take snapshot, data(MB)
     loop: 1
+    thinktime: 5
     load:
       desc: load data
       crequests: 10
       size: 0.1
       loop: 3
-      thinktime: 2
+      thinktime: 5
 
   rollback:
     desc: random select one snapshot from take_snapshot session. test import from url and import from data
     loop: 1
+    thinktime: 5
     load:
       desc: load data
       crequests: 3
       size: 0.3
       loop: 10
-      thinktime: 2
+      thinktime: 5
     import_from_url: true
     import_from_data: true
 

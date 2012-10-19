@@ -9,6 +9,11 @@ module Utils
 
     include Utils::Results
 
+    def think(thinktime)
+      rand = Random.new
+      sleep(rand(20) / 20.0 * thinktime)
+    end
+
     ################### HTTP Action ############################
     def create_datastore(uri, service_name)
       path = URI.encode_www_form("service" => service_name)
@@ -243,7 +248,8 @@ module Utils
       service = services.first
 
       instance = client.service_instance
-      instance.name = "#{instance_name}-#{uuid}"
+      instance_name = "#{instance_name}-#{uuid}"
+      instance.name = instance_name
 
       if v2?(client)
         instance.service_plan = service.service_plans.select {|p| p == manifest["plan"]}.first

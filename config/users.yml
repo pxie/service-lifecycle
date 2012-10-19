@@ -2,26 +2,6 @@
 control_domain: api.cf87.dev.las01.vcsops.com
 email: service-lifecycle@vmware.com
 password: 123456
-sum: 10
+sum: 200
 startfrom: 0
-users: 
-- email: service-lifecycle0@vmware.com
-  password: 123456
-- email: service-lifecycle1@vmware.com
-  password: 123456
-- email: service-lifecycle2@vmware.com
-  password: 123456
-- email: service-lifecycle3@vmware.com
-  password: 123456
-- email: service-lifecycle4@vmware.com
-  password: 123456
-- email: service-lifecycle5@vmware.com
-  password: 123456
-- email: service-lifecycle6@vmware.com
-  password: 123456
-- email: service-lifecycle7@vmware.com
-  password: 123456
-- email: service-lifecycle8@vmware.com
-  password: 123456
-- email: service-lifecycle9@vmware.com
-  password: 123456
+

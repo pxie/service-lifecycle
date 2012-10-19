@@ -19,7 +19,8 @@ module Worker
     end
 
     def think(thinktime)
-      sleep(rand(20) / 20 * thinktime)
+      rand = Random.new
+      sleep(rand(20) / 20.0 * thinktime)
     end
 
     def parse_header

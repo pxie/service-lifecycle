@@ -47,6 +47,7 @@ load_config.each do |scenario, details|
       if s = details["preload"]
         s["loop"].times do
           load_data(uri, service_name, s["load"])
+          think(s["thinktime"])
         end
       end
 
@@ -59,6 +60,7 @@ load_config.each do |scenario, details|
           $log.info("Take snapshot job. index: #{index}")
           take_snapshot(uri, service_name, header)
           load_data(uri, service_name, s["load"])
+          think(s["thinktime"])
         end
       end
 
@@ -76,6 +78,7 @@ load_config.each do |scenario, details|
 
             load_data(uri, service_name, s["load"])
             take_snapshot(uri, service_name, header)
+            think(s["thinktime"])
 
             if s["import_from_url"]
               snapshots = list_snapshot(uri, service_name, header)
@@ -86,6 +89,7 @@ load_config.each do |scenario, details|
               validate_data(uri, service_name)
               take_snapshot(uri, service_name, header)
               delete_snapshot(uri, service_name, header, snapshot_id)
+              think(s["thinktime"])
             end
 
             if s["import_from_data"]
@@ -97,6 +101,7 @@ load_config.each do |scenario, details|
               validate_data(uri, service_name)
               take_snapshot(uri, service_name, header)
               delete_snapshot(uri, service_name, header, snapshot_id)
+              think(s["thinktime"])
             end
           end
         end
