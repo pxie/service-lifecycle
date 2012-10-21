@@ -119,7 +119,7 @@ module Utils
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Take Snapshot", result)
-      response.body
+      result == "pass" ? response.body : {"snapshots" => []}.to_json
     end
 
     def validate_snapshot(uri, service, header, totalnum)
