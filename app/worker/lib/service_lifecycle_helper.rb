@@ -36,6 +36,7 @@ module Worker
     end
 
     resp = easy.body_str
+    $log.debug("list snapshots. url: #{easy.url}, resp: #{resp}")
     #resp.should_not == nil
     #JSON.parse(resp)
 
