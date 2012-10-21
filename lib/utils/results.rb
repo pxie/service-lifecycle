@@ -5,9 +5,12 @@ module Utils
     module_function
 
     RESULTS_TABLE = "results"
+    RESULT_DB     = "results.db"
 
     def create_db()
-      $db = SQLite3::Database.open(":memory:")
+      File.delete(RESULT_DB) if File.exists?(RESULT_DB)
+
+      $db = SQLite3::Database.open(RESULT_DB)
       $db.execute("create table if not exists #{RESULTS_TABLE}(id integer primary key," +
                       " time TIMESTAMP, worker text, op text, result text);")
       $log.debug("create results db. db: #{$db.inspect}")

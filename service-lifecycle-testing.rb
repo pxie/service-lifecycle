@@ -18,6 +18,7 @@ users = user_config["users"]
 #$log = Logger.new('testing.log', 'daily')
 Utils::Results.create_db
 
+now = Time.now
 load_config.each do |scenario, details|
   $log.info("start to test scenario #{scenario}")
 
@@ -114,7 +115,10 @@ load_config.each do |scenario, details|
     sleep(2)
   end
   threads.each { |t| t.join }
+  duration = Time.now - now
   puts "prepare results"
+  puts "testing execution duration: #{duration / 60.0 / 60.0} hours"
+  $log.info("testing execution duration: #{duration / 60.0 / 60.0} hours")
   print_result
 end
 
