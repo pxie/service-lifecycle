@@ -69,13 +69,13 @@ end
 get '/snapshot/queryjobstatus' do
   begin
     service     = params[:service]
-    $log.info("service name: #{service}")
+    job_id      = params[:jobid]
+    $log.info("query job status. service name: #{service}")
 
     parse_header
     service_id  = get_service_id(service)
-    resp = create_snapshot(service_id)
-
-    resp
+    job = get_job(service_id, job_id)
+    job.to_json
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
     $log.error("e: #{e.inspect}")
@@ -146,6 +146,16 @@ post '/snapshot/delete' do
   end
 end
 
+post '/snapshot/createurl' do
+  service     = params[:service]
+  snapshot_id = params[:snapshotid]
+
+  parse_header
+  service_id  = get_service_id(service)
+
+  create_serialized_url(service_id, snapshot_id)
+
+end
 #import service from url
 post '/snapshot/importurl' do
   begin
@@ -153,12 +163,14 @@ post '/snapshot/importurl' do
     snapshot_id = params[:snapshotid]
 
     parse_header
+    request.body.rewind
+    body = JSON.parse(request.body.read)
+    serialized_url = body["url"]
     service_id  = get_service_id(service)
 
-    serialized_url = create_serialized_url(service_id, snapshot_id)
-    import_url_snapshot_id = import_service_from_url(service_id, serialized_url)
+    #serialized_url = create_serialized_url(service_id, snapshot_id)
+    import_service_from_url(service_id, serialized_url)
 
-    import_url_snapshot_id
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
     $log.error("e: #{e.inspect}")
@@ -176,12 +188,14 @@ post '/snapshot/importdata' do
     parse_header
     service_id  = get_service_id(service)
 
-    serialized_url = create_serialized_url(service_id, snapshot_id)
+    request.body.rewind
+    body = JSON.parse(request.body.read)
+    serialized_url = body["url"]
+
+    #serialized_url = create_serialized_url(service_id, snapshot_id)
     $log.debug("import data. serialized_url: #{serialized_url}")
     serialized_data = download_data(serialized_url)
-    import_data_snapshot_id = import_service_from_data(service_id, serialized_data)
-
-    import_data_snapshot_id
+    import_service_from_data(service_id, serialized_data)
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
     $log.error("e: #{e.inspect}")

@@ -83,8 +83,9 @@ module Utils
         $log.info("create snaphsot. url: #{url}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
-        resp = JSON.parse(response.body)
-        result = "fail" if resp["status"] == "failed"
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header, service,job["job_id"])
+        result = "fail" if job["status"] == "failed"
       rescue Exception => e
         $log.error("fail to create snaphost. url: #{url}\n#{e.inspect}")
         result = "fail"
@@ -128,8 +129,8 @@ module Utils
       begin
         puts "validate snapshot. url: #{url}"
         $log.info("validate snapshot. url: #{url}, service: #{service}")
-        timeout = 5 * 60 * 60 # wait 5 hrs
-        sleep_time = 1
+        timeout = 10 * 60 * 60 # wait 5 hrs
+        sleep_time = 30
         while timeout > 0
           sleep(sleep_time)
           timeout -= sleep_time
@@ -144,8 +145,7 @@ module Utils
         end
         result = "fail" unless timeout > 0
       rescue Exception => e
-        $log.error("fail to list snapshot. url: #{url}, "+
-                       "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
+        $log.error("fail to list snapshot. url: #{url}, service: #{service}\n#{e.inspect}")
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Validate snapshot", result)
@@ -186,6 +186,10 @@ module Utils
         $log.info("rollback snapshot. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header,service,job["job_id"])
+
+        result = "fail" unless job["result"]["result"] == "ok"
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
         $log.error("fail to rollback snapshot. url: #{url}, "+
@@ -195,19 +199,47 @@ module Utils
       insert_result(get_service_domain(uri), "Rollback Snapshot", result)
     end
 
+    def wait_job(uri, header, service, job_id)
+      timeout = 10 * 60 * 60
+      sleep_time = 10
+      while timeout > 0
+        sleep sleep_time
+        timeout -= sleep_time
+
+        path = URI.encode_www_form({"service"     => service,
+                                    "jobid"       => job_id})
+        url = "#{uri}/snapshot/queryjobstatus?#{path}"
+        begin
+          $log.debug("query job status. url: #{url}")
+          response = RestClient.get(url, header)
+          job = JSON.parse(response.body)
+          $log.debug("query job status. Job: #{job}")
+          return job if job["status"] == "completed" || job["status"] == "failed"
+        rescue Exception => e
+          $log.error("fail to query job status. url: #{url}\n#{e.inspect}")
+        end
+      end
+    end
+
     def import_from_data(uri, service, header, snapshot_id)
-      result = "pass"
+      result, serialized_url = import_from_url(uri, service, header, snapshot_id)
+      return if result == "fail"
+
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
       url = "#{uri}/snapshot/importdata?#{path}"
+      body = {"url" => serialized_url}.to_json
       begin
         puts "import from data. url: #{url}"
         $log.info("import from data. url: #{url}, service: #{service}," +
-                      " snapshot_id: #{snapshot_id.inspect}")
-        response = RestClient.post(url, "", header)
+                      " snapshot_id: #{snapshot_id.inspect}, body: #{body}")
+        response = RestClient.post(url, body, header)
         $log.debug("response: #{response.code}, body: #{response.body}")
-        resp = JSON.parse(response.body)
-        result = "fail" if resp["status"] == "failed"
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header,service,job["job_id"])
+        if !(job.is_a?(Hash) && job["result"] && job["result"]["snapshot_id"])
+          result = "fail"
+        end
       rescue Exception => e
         $log.error("fail to import from data. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
@@ -220,19 +252,43 @@ module Utils
       result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
-      url = "#{uri}/snapshot/importurl?#{path}"
+      url = "#{uri}/snapshot/createurl?#{path}"
+      #url = "#{uri}/snapshot/importurl?#{path}"
       begin
-        puts "import from url. url: #{url}"
-        $log.info("import from url. url: #{url}, service: #{service}," +
+        puts "create url. url: #{url}"
+        $log.info("create url. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header,service,job["job_id"])
+        if !(job.is_a?(Hash) && job["result"] && job["result"]["url"])
+          result = "fail"
+          insert_result(get_service_domain(uri), "create serialized URL", result)
+          return
+        end
+        serialized_url = job["result"]["url"]
+
+        path = URI.encode_www_form({"service"     => service})
+        url = "#{uri}/snapshot/importurl?#{path}"
+        body = {"url" => job["result"]["url"]}.to_json
+
+        puts "import from url. url: #{url}, body: #{body}"
+        $log.info("import from url. url: #{url}, service: #{service}, body: #{body}")
+        response = RestClient.post(url, body, header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header,service,job["job_id"])
+        if !(job.is_a?(Hash) && job["result"] && job["result"]["snapshot_id"])
+          result = "fail"
+        end
       rescue Exception => e
         $log.error("fail to import from url. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Import from URL", result)
+      [result, serialized_url]
     end
 
     def random_snapshot(json_body)

@@ -60,8 +60,8 @@ load_config.each do |scenario, details|
       end
 
       if s = details["rollback"]
-        s["loop"].times do  |index|
-          if validate_snapshot(uri, service_name, header, details["take_snapshot"]["loop"])
+        if validate_snapshot(uri, service_name, header, details["take_snapshot"]["loop"])
+         s["loop"].times do |index|
             $log.info("Rollback snapshot job. index: #{index}")
             snapshots = list_snapshot(uri, service_name, header)
 

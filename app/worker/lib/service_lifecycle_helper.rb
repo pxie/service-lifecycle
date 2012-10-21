@@ -83,12 +83,12 @@ module Worker
 
     resp = easy.body_str
     #resp.should_not == nil
-    job = JSON.parse(resp)
-    job = wait_job(service_id, job["job_id"])
-    #job.should_not == nil
-    snapshot_id = job["result"]["snapshot_id"]
-    #snapshot_id.should_not == nil
-    job
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id, job["job_id"])
+    ##job.should_not == nil
+    #snapshot_id = job["result"]["snapshot_id"]
+    ##snapshot_id.should_not == nil
+    #job
   end
 
   def import_service_from_data(service_id, serialized_data)
@@ -106,14 +106,14 @@ module Worker
     serialized_data.unlink
 
     resp = easy.body_str
-    $log.info("Response from import data: #{resp}")
-    #resp.should_not == nil
-    job = JSON.parse(resp)
-    job = wait_job(service_id, job["job_id"])
-    #job.should_not == nil
-    snapshot_id = job["result"]["snapshot_id"]
-    #snapshot_id.should_not == nil
-    job
+    #$log.info("Response from import data: #{resp}")
+    ##resp.should_not == nil
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id, job["job_id"])
+    ##job.should_not == nil
+    #snapshot_id = job["result"]["snapshot_id"]
+    ##snapshot_id.should_not == nil
+    #job
   end
 
   def parse_service_id(content, srv_name)
@@ -138,12 +138,12 @@ module Worker
 
     #easy.response_code.should == 200
     resp = easy.body_str
-    $log.debug("create serialized url. response: #{resp.inspect}")
-    #resp.should_not == nil
-    job = JSON.parse(resp)
-    job = wait_job(service_id,job["job_id"])
-    job = JSON.parse(job)
-    job["result"]["url"]
+    #$log.debug("create serialized url. response: #{resp.inspect}")
+    ##resp.should_not == nil
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id,job["job_id"])
+    #job = JSON.parse(job)
+    #job["result"]["url"]
   end
 
   def post_and_verify_service(service_manifest, app, key, data)
@@ -195,13 +195,14 @@ module Worker
     easy.http_put ''
 
     #easy.response_code.should == 200
+
     resp = easy.body_str
-    #resp.should_not == nil
-    job = JSON.parse(resp)
-    job = wait_job(service_id,job["job_id"])
-    #job.should_not == nil
-    #job["result"]["result"].should == "ok"
-    job
+    ##resp.should_not == nil
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id,job["job_id"])
+    ##job.should_not == nil
+    ##job["result"]["result"].should == "ok"
+    #job
   end
 
   def delete_snapshot(service_id, snapshot_id)
