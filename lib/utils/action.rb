@@ -172,6 +172,13 @@ module Utils
                       " snapshot_id: #{snapshot_id.inspect}")
         response = RestClient.post(url, "", header)
         $log.debug("response: #{response.code}, body: #{response.body}")
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header, service,job["job_id"])
+        if job.is_a?(Hash) && job["result"] && job["result"]["result"] == "ok"
+          result = "pass"
+        else
+          result = "fail"
+        end
       rescue Exception => e
         $log.error("fail to delete snapshot. url: #{url}, "+
                        "service: #{service}, snapshot_id: #{snapshot_id.inspect}\n#{e.inspect}")

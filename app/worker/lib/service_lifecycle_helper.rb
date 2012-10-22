@@ -220,12 +220,12 @@ module Worker
 
     #easy.response_code.should == 200
     resp = easy.body_str
-    #resp.should_not == nil
-    job = JSON.parse(resp)
-    job = wait_job(service_id, job["job_id"])
-    #job.should_not == nil
-    #job["result"]["result"].should == "ok"
-    job
+    ##resp.should_not == nil
+    #job = JSON.parse(resp)
+    #job = wait_job(service_id, job["job_id"])
+    ##job.should_not == nil
+    ##job["result"]["result"].should == "ok"
+    #job
   end
 
   def wait_job(service_id, job_id)
