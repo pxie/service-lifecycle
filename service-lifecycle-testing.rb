@@ -83,13 +83,15 @@ load_config.each do |scenario, details|
                 if has_snapshot?(snapshots)
                   snapshot_id = random_snapshot(snapshots)
 
-                  import_from_url(uri, service_name, header, snapshot_id)
-                  think(s["thinktime"])
-                  validate_data(uri, service_name)
-                  load_data(uri, service_name, s["load"])
-                  think(s["thinktime"])
-                  delete_snapshot(uri, service_name, header, snapshot_id)
-                  think(s["thinktime"])
+                  result, _ = import_from_url(uri, service_name, header, snapshot_id)
+                  if result == "pass"
+                    think(s["thinktime"])
+                    validate_data(uri, service_name)
+                    load_data(uri, service_name, s["load"])
+                    think(s["thinktime"])
+                    delete_snapshot(uri, service_name, header, snapshot_id)
+                    think(s["thinktime"])
+                  end
                 end
               end
 
@@ -98,13 +100,15 @@ load_config.each do |scenario, details|
                 if has_snapshot?(snapshots)
                   snapshot_id = random_snapshot(snapshots)
 
-                  import_from_data(uri, service_name, header, snapshot_id)
-                  validate_data(uri, service_name)
-                  think(s["thinktime"])
-                  load_data(uri, service_name, s["load"])
-                  think(s["thinktime"])
-                  delete_snapshot(uri, service_name, header, snapshot_id)
-                  think(s["thinktime"])
+                  result = import_from_data(uri, service_name, header, snapshot_id)
+                  if result == "pass"
+                    validate_data(uri, service_name)
+                    think(s["thinktime"])
+                    load_data(uri, service_name, s["load"])
+                    think(s["thinktime"])
+                    delete_snapshot(uri, service_name, header, snapshot_id)
+                    think(s["thinktime"])
+                  end
                 end
               end
             end

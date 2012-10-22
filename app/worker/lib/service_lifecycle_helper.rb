@@ -68,7 +68,9 @@ module Worker
       c.on_body{|data| f.write(data)}
       c.perform
       #c.response_code.should == 200
+      $log.debug("download data. url: #{c.url}, response: #{c.response_code}")
     end
+
     File.open(temp_file.path) do |f|
       $log.debug("serialized data size: #{f.size / 1024 / 1024}MB")#f.size.should > 0
     end
@@ -103,10 +105,14 @@ module Worker
     easy.resolve_mode =:ipv4
     easy.http_post(post_data)
 
+    resp = easy.body_str
+    $log.info("import data. service id: #{service_id}, serialized_data: #{serialized_data.path}, resp: #{resp}")
+
     #delete the temp file
     serialized_data.unlink
 
-    resp = easy.body_str
+    resp
+
     #$log.info("Response from import data: #{resp}")
     ##resp.should_not == nil
     #job = JSON.parse(resp)

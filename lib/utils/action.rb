@@ -85,7 +85,11 @@ module Utils
         $log.debug("response: #{response.code}, body: #{response.body}")
         job = JSON.parse(response.body)
         job = wait_job(uri,header, service,job["job_id"])
-        result = "fail" if job["status"] == "failed"
+        if job.is_a?(Hash) && job["status"] && job["status"] == "completed"
+          result = "pass"
+        else
+          result = "fail"
+        end
       rescue Exception => e
         $log.error("fail to create snaphost. url: #{url}\n#{e.inspect}")
         result = "fail"
@@ -188,8 +192,10 @@ module Utils
         response = RestClient.post(url, "", header)
         job = JSON.parse(response.body)
         job = wait_job(uri,header,service,job["job_id"])
+        if !(job.is_a?(Hash) && job["result"] && job["result"]["result"] && job["result"]["result"] == "ok")
+          result = "fail"
+        end
 
-        result = "fail" unless job["result"]["result"] == "ok"
         $log.debug("response: #{response.code}, body: #{response.body}")
       rescue Exception => e
         $log.error("fail to rollback snapshot. url: #{url}, "+
@@ -200,6 +206,7 @@ module Utils
     end
 
     def wait_job(uri, header, service, job_id)
+      return {} unless job_id
       timeout = 10 * 60 * 60
       sleep_time = 10
       while timeout > 0
@@ -222,14 +229,31 @@ module Utils
     end
 
     def import_from_data(uri, service, header, snapshot_id)
-      result, serialized_url = import_from_url(uri, service, header, snapshot_id)
-      return if result == "fail"
-
+      result = "pass"
       path = URI.encode_www_form({"service"     => service,
                                   "snapshotid"  => snapshot_id})
-      url = "#{uri}/snapshot/importdata?#{path}"
-      body = {"url" => serialized_url}.to_json
+      url = "#{uri}/snapshot/createurl?#{path}"
       begin
+        puts "create url. url: #{url}"
+        $log.info("create url. url: #{url}, service: #{service}," +
+                      " snapshot_id: #{snapshot_id.inspect}")
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+        job = JSON.parse(response.body)
+        job = wait_job(uri,header,service,job["job_id"])
+        if !(job.is_a?(Hash) && job["result"] && job["result"]["url"])
+          result = "fail"
+          insert_result(get_service_domain(uri), "create serialized URL", result)
+          return
+        end
+        serialized_url = job["result"]["url"]
+
+
+        path = URI.encode_www_form({"service"     => service,
+                                    "snapshotid"  => snapshot_id})
+        url = "#{uri}/snapshot/importdata?#{path}"
+        body = {"url" => serialized_url}.to_json
+
         puts "import from data. url: #{url}"
         $log.info("import from data. url: #{url}, service: #{service}," +
                       " snapshot_id: #{snapshot_id.inspect}, body: #{body}")
@@ -246,6 +270,7 @@ module Utils
         result = "fail"
       end
       insert_result(get_service_domain(uri), "Import from Data", result)
+      result
     end
 
     def import_from_url(uri, service, header, snapshot_id)
