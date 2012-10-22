@@ -141,8 +141,7 @@ post '/snapshot/delete' do
     parse_header
     service_id  = get_service_id(service)
 
-    resp = delete_snapshot(service_id, snapshot_id)
-    resp.to_json
+    delete_snapshot(service_id, snapshot_id)
   rescue Exception => e
     $log.error("*** FATAL UNHANDLED EXCEPTION ***")
     $log.error("e: #{e.inspect}")

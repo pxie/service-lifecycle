@@ -220,6 +220,8 @@ module Worker
 
     #easy.response_code.should == 200
     resp = easy.body_str
+    $log.debug("delete snapshot. resp: #{resp}")
+    resp
     ##resp.should_not == nil
     #job = JSON.parse(resp)
     #job = wait_job(service_id, job["job_id"])
