@@ -46,6 +46,11 @@ get '/validatedata' do
   validatedata(service_name)
 end
 
+get '/cleardata' do
+  service_name = params[:service]
+  cleardata(service_name)
+end
+
 #create snapshot
 post '/snapshot/create' do
   begin
@@ -563,3 +568,17 @@ get '/foobar' do
   @token
 end
 
+# get memory usage of redis (MB)
+get '/redis/memory' do
+  $log.info("get redis memory")
+  used_memory = ''
+  client = load_redis
+  $log.info("client info: #{client.info}")
+  client.info.each {|i|
+    if i[0] == 'used_memory'
+      used_memory = i[1]
+      break
+    end
+  }
+  body "#{used_memory.to_f / 1024 / 1024}"
+end

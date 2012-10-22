@@ -9,10 +9,15 @@ module Worker
     MYSQL_TABLE_NAME      = "data_values"
     MYSQL_MAX_BIN_LENGTH  = 5 * 1024 * 1024
 
+    REDIS_TABLE_NAME      = "data_values"
+    REDIS_MAX_BIN_LENGTH  = 5 * 1024 * 1024
+
     def createdatastore(service_name)
       case service_name
         when "mysql"
           create_mysql_datastore(MYSQL_TABLE_NAME)
+        when "redis"
+          $log.info("redis needs not creating datastore but just inserting data directly")
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -22,6 +27,19 @@ module Worker
       case service_name
         when "mysql"
           validate_mysql_datastore(MYSQL_TABLE_NAME)
+        when "redis"
+          validate_redis_datastore()
+        else
+          $log.error("invalid service: #{service_name}")
+      end
+    end
+
+    def cleardata(service_name)
+      case service_name
+        when "mysql"
+          clear_mysql_datastore(MYSQL_TABLE_NAME)
+        when "redis"
+          clear_redis_datastore()
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -53,7 +71,7 @@ module Worker
             think(thinktime)
           end
           $log.debug("close client. client: #{client.inspect}")
-          client.close
+          close_connection(service_name, client)
         end
         sleep(1) # ramp up
       end
@@ -65,8 +83,6 @@ module Worker
     end
 
 
-    private
-
     ########### common function ###################
 
     def get_client(service_name)
@@ -75,6 +91,9 @@ module Worker
         when "mysql"
           client = get_mysql_client
           $log.debug("get_client. mysql client: #{client.inspect}")
+        when "redis"
+          client = get_redis_client
+          $log.debug("get_client. redis client: #{client.inspect}")
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -85,6 +104,8 @@ module Worker
       case service_name
         when "mysql"
           insert_data_to_mysql(client, data, sha1sum)
+        when "redis"
+          insert_data_to_redis(client, data, sha1sum)
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -93,7 +114,7 @@ module Worker
     def get_total_counts(service_name)
       client = get_client(service_name)
       counts = do_counts(service_name, client)
-      client.close
+      close_connection(service_name, client)
       counts
     end
 
@@ -101,6 +122,19 @@ module Worker
       case service_name
         when "mysql"
           count_mysql_records(client)
+        when "redis"
+          count_redis_records(client)
+        else
+          $log.error("invalid service: #{service_name}")
+      end
+    end
+
+    def close_connection(service_name, client)
+      case service_name
+        when "mysql"
+          client.close
+        when "mysql"
+          client.quit
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -168,5 +202,67 @@ module Worker
       client.close
       "OK"
     end
+
+    def clear_mysql_datastore
+    end
+
+    def get_redis_client
+      redis_service = load_service('redis')
+      Redis.new(:host => redis_service['host'],
+                :port => redis_service['port'],
+                :user => redis_service['username'],
+                :password => redis_service['password'])
+    end
+
+    def insert_data_to_redis(client, data, sha1sum)
+      key = sha1sum
+      $log.info("insert data to redis. client: #{client.inspect}, key: #{sha1sum}, data size: #{data.size}, sha1sum: #{sha1sum}")
+      client.set(key, data)
+    end
+
+    def count_redis_records(client)
+      keys = client.keys("*")
+      $log.debug("count_redis_records. keys: #{keys.inspect}, counts: #{keys.count}")
+      keys.count
+    end
+
+    def validate_redis_datastore()
+      client = get_redis_client
+      $log.info("validate redis datastore. client: #{client.inspect}")
+      keys = client.keys("*")
+
+      count = keys.count
+      if count > 0
+        rand = Random.new
+        8.times do
+          index = rand(count)
+          key = keys[index]
+          $log.debug("validate redis datastore. redis: get key #{key}")
+          data = client.get(key)
+          #$log.info("result: #{result}")
+          $log.info("sha1sum is: #{key}")
+          sha1sum_res = sha1sum(data)
+          if sha1sum_res != key
+            raise RuntimeError, "key: #{key}, expected sha1sum: #{key}, but now: #{sha1sum_res}"
+          end
+        end
+      end
+      client.quit
+      "OK"
+    end
+
+    def clear_redis_datastore
+      client = get_redis_client
+      $log.info("Clear redies datastore. client: #{client.inspect}")
+      keys = client.keys("*")
+
+      count = keys.count
+      for index in 0..count do
+        key = keys[index]
+        client.del(key)
+      end
+      client.quit
+      "OK"
+     end
   end
 end

@@ -1,4 +1,5 @@
 require 'digest/sha1'
+require 'digest/md5'
 require "base64"
 
 module Worker
@@ -16,6 +17,10 @@ module Worker
 
     def sha1sum(data)
       Digest::SHA1.hexdigest(data)
+    end
+
+    def md5(data)
+      Digest::MD5.hexdigest(data)
     end
 
     def think(thinktime)
