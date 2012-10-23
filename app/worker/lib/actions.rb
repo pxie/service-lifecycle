@@ -12,37 +12,22 @@ module Worker
     REDIS_TABLE_NAME      = "data_values"
     REDIS_MAX_BIN_LENGTH  = 5 * 1024 * 1024
 
+    POSTGRESQL_TABLE_NAME      = "data_values"
+    POSTGRESQL_MAX_BIN_LENGTH  = 5 * 1024 * 1024
+
+    MONGODB_TABLE_NAME      = "data_values"
+    MONGODB_MAX_BIN_LENGTH  = 5 * 1024 * 1024
+
     def createdatastore(service_name)
-      case service_name
-        when "mysql"
-          create_mysql_datastore(MYSQL_TABLE_NAME)
-        when "redis"
-          $log.info("redis needs not creating datastore but just inserting data directly")
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("create_#{service_name}_datastore")
     end
 
     def validatedata(service_name)
-      case service_name
-        when "mysql"
-          validate_mysql_datastore(MYSQL_TABLE_NAME)
-        when "redis"
-          validate_redis_datastore()
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("validate_#{service_name}_datastore")
     end
 
     def cleardata(service_name)
-      case service_name
-        when "mysql"
-          clear_mysql_datastore(MYSQL_TABLE_NAME)
-        when "redis"
-          clear_redis_datastore()
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("clear_#{service_name}_datastore")
     end
 
     def insertdata(service_name, crequests, size, loop, thinktime)
@@ -87,28 +72,13 @@ module Worker
 
     def get_client(service_name)
       client = nil
-      case service_name
-        when "mysql"
-          client = get_mysql_client
-          $log.debug("get_client. mysql client: #{client.inspect}")
-        when "redis"
-          client = get_redis_client
-          $log.debug("get_client. redis client: #{client.inspect}")
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("client = get_#{service_name}_client")
+      $log.debug("get_client. #{service_name} client: #{client.inspect}")
       client
     end
 
     def do_insert_data(service_name, client, data, sha1sum)
-      case service_name
-        when "mysql"
-          insert_data_to_mysql(client, data, sha1sum)
-        when "redis"
-          insert_data_to_redis(client, data, sha1sum)
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("insert_data_to_#{service_name}(client, data, sha1sum)")
     end
 
     def get_total_counts(service_name)
@@ -119,22 +89,19 @@ module Worker
     end
 
     def do_counts(service_name, client)
-      case service_name
-        when "mysql"
-          count_mysql_records(client)
-        when "redis"
-          count_redis_records(client)
-        else
-          $log.error("invalid service: #{service_name}")
-      end
+      eval("count_#{service_name}_records(client)")
     end
 
     def close_connection(service_name, client)
       case service_name
         when "mysql"
           client.close
-        when "mysql"
+        when "redis"
           client.quit
+        when "postgresql"
+          client.close
+        when "mongodb"
+          $log.info("close: #{service_name}")
         else
           $log.error("invalid service: #{service_name}")
       end
@@ -146,15 +113,15 @@ module Worker
 
 
 
-    ########## mysql functions ########
-    def create_mysql_datastore(table)
+    ########## mysql functions ##########
+    def create_mysql_datastore
       client = get_mysql_client
       $log.debug("create_mysql_datastore. client: #{client.inspect}")
-      result = client.query("SELECT table_name FROM information_schema.tables WHERE table_name = '#{table}'");
-      result = client.query("Create table IF NOT EXISTS #{table} " +
+      result = client.query("SELECT table_name FROM information_schema.tables WHERE table_name = '#{MYSQL_TABLE_NAME}'");
+      result = client.query("Create table IF NOT EXISTS #{MYSQL_TABLE_NAME} " +
                                 "( id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY, " +
                                 "data VARBINARY(#{MYSQL_MAX_BIN_LENGTH}), sha1sum varchar(50)); ") if result.count != 1
-      $log.info("create table: #{table}. result: #{result.inspect}, client: #{client.inspect}")
+      $log.info("create table: #{MYSQL_TABLE_NAME}. result: #{result.inspect}, client: #{client.inspect}")
       client.close
       {:state => "OK", :result => result.inspect, :client => client.inspect}.to_json
     end
@@ -179,17 +146,17 @@ module Worker
       result.count
     end
 
-    def validate_mysql_datastore(table)
+    def validate_mysql_datastore
       client = get_mysql_client
       $log.info("validate mysql datastore. client: #{client.inspect}")
-      result = client.query("select * from #{table};")
+      result = client.query("select * from #{MYSQL_TABLE_NAME};")
       count = result.count
       if count > 0
         rand = Random.new
         8.times do
           index = rand(count)
-          $log.debug("validate mysql datastore. SQL: select * from #{table} where id = #{index}")
-          results = client.query("select * from #{table} where id = #{index};")
+          $log.debug("validate mysql datastore. SQL: select * from #{MYSQL_TABLE_NAME} where id = #{index}")
+          results = client.query("select * from #{MYSQL_TABLE_NAME} where id = #{index};")
           results.each do |r|
 
             if sha1sum(r["data"]) != r["sha1sum"]
@@ -204,6 +171,10 @@ module Worker
     end
 
     def clear_mysql_datastore
+    end
+
+    ########## redis functions ##########
+    def create_redis_datastore
     end
 
     def get_redis_client
@@ -226,7 +197,7 @@ module Worker
       keys.count
     end
 
-    def validate_redis_datastore()
+    def validate_redis_datastore
       client = get_redis_client
       $log.info("validate redis datastore. client: #{client.inspect}")
       keys = client.keys("*")
@@ -253,7 +224,7 @@ module Worker
 
     def clear_redis_datastore
       client = get_redis_client
-      $log.info("Clear redies datastore. client: #{client.inspect}")
+      $log.info("Clear redis datastore. client: #{client.inspect}")
       keys = client.keys("*")
 
       count = keys.count
@@ -264,5 +235,107 @@ module Worker
       client.quit
       "OK"
      end
+
+    ########## postgresql functions ##########
+    def create_postgresql_datastore
+      client = get_postgresql_client
+      $log.debug("create_postgresql_datastore. client: #{client.inspect}")
+      result = client.query("create table #{POSTGRESQL_TABLE_NAME} (id varchar(50), data text);") if client.query("select * from pg_catalog.pg_class where relname = '#{POSTGRESQL_TABLE_NAME}';").num_tuples() < 1
+      $log.info("create table: #{POSTGRESQL_TABLE_NAME}. result: #{result.inspect}, client: #{client.inspect}")
+      client.close
+      {:state => "OK", :result => result.inspect, :client => client.inspect}.to_json
+    end
+
+    def get_postgresql_client
+      postgresql_service = load_service('postgresql')
+      PGconn.open(postgresql_service['host'],
+                  postgresql_service['port'],
+                  :dbname => postgresql_service['name'],
+                  :user => postgresql_service['username'],
+                  :password => postgresql_service['password'])
+    end
+
+    def insert_data_to_postgresql(client, data, sha1sum)
+      $log.info("insert data to postgresql. client: #{client.inspect}, data size: #{data.size}, sha1sum: #{sha1sum}")
+      client.query("insert into #{POSTGRESQL_TABLE_NAME} (id, data) values('#{sha1sum}','#{data}');")
+    end
+
+    def count_postgresql_records(client)
+      result = client.query("select * from #{POSTGRESQL_TABLE_NAME};")
+      $log.debug("count_postgresql_records. result: #{result.inspect}, counts: #{result.count}")
+      result.count
+    end
+
+    def validate_postgresql_datastore
+      client = get_postgresql_client
+      $log.info("validate postgresql datastore. client: #{client.inspect}")
+      rand = Random.new
+      8.times do
+        $log.debug("validate postgresql datastore. SQL: select * from #{POSTGRESQL_TABLE_NAME} order by random() limit 1;")
+        results = client.query("select * from #{POSTGRESQL_TABLE_NAME} order by random() limit 1;")
+        results.each do |r|
+          id = r["id"]
+          $log.info("validate postgresql datastore. id: #{id};")
+          sha1sum_res = sha1sum(r["data"])
+          if sha1sum_res != id
+            raise RuntimeError, "id: #{id}, expected sha1sum: #{id}, but now: #{sha1sum_res}"
+          end
+        end
+      end
+      client.close
+      "OK"
+    end
+
+    def clear_postgresql_datastore
+      client = get_postgresql_client
+      $log.info("Clear postgresql datastore. client: #{client.inspect}")
+      client.query("delete from #{POSTGRESQL_TABLE_NAME};")
+      client.query("drop table #{POSTGRESQL_TABLE_NAME};")
+    end
+
+    ########## mongodb functions ##########
+    def create_mongodb_datastore
+    end
+
+    def get_mongodb_client
+      mongodb_service = load_service('mongodb')
+      conn = Mongo::Connection.new(mongodb_service['hostname'], mongodb_service['port'])
+      db = conn[mongodb_service['db']]
+      coll = db[MONGODB_TABLE_NAME] if db.authenticate(mongodb_service['username'], mongodb_service['password'])
+    end
+
+    def insert_data_to_mongodb(client, data, sha1sum)
+      $log.info("insert data to mongodb. client: #{client.inspect}, data size: #{data.size}, sha1sum: #{sha1sum}")
+      client.insert( { '_id' => sha1sum, 'data' => data } )
+    end
+
+    def count_mongodb_records(client)
+      result = client.find()
+      $log.debug("count_mongodb_records. result: #{result.inspect}, counts: #{result.count}")
+      result.count
+    end
+
+    def validate_mongodb_datastore
+      client = get_mongodb_client
+      $log.info("validate mongodb datastore. client: #{client.inspect}")
+      results = client.find().to_a
+      count = results.count
+      8.times do
+        random = (rand * 10000 % count).to_i
+        r = results[random]
+        id = r["_id"]
+        $log.info("validate postgresql datastore. id: #{id};")
+        sha1sum_res = sha1sum(r["data"])
+        if sha1sum_res != id
+          raise RuntimeError, "id: #{id}, expected sha1sum: #{id}, but now: #{sha1sum_res}"
+        end
+      end
+      "OK"
+    end
+
+    def clear_mongodb_datastore
+      client = get_mongodb_client
+      client.remove({})
+    end
   end
 end
