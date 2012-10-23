@@ -61,54 +61,53 @@ load_config.each do |scenario, details|
       end
 
       if s = details["rollback"]
-        if validate_snapshot(uri, service_name, header, details["take_snapshot"]["loop"])
-         s["loop"].times do |index|
-            $log.info("Rollback snapshot job. index: #{index}")
-            snapshots = list_snapshot(uri, service_name, header)
+        validate_snapshot(uri, service_name, header, details["take_snapshot"]["loop"])
+        s["loop"].times do |index|
+          $log.info("Rollback snapshot job. index: #{index}")
+          snapshots = list_snapshot(uri, service_name, header)
 
-            if has_snapshot?(snapshots)
-              # random select one snapshot
-              snapshot_id = random_snapshot(snapshots)
-              rollback_snapshot(uri, service_name, header, snapshot_id)
-              think(s["thinktime"])
-              validate_data(uri, service_name)
-              delete_snapshot(uri, service_name, header, snapshot_id)
+          if has_snapshot?(snapshots)
+            # random select one snapshot
+            snapshot_id = random_snapshot(snapshots)
+            rollback_snapshot(uri, service_name, header, snapshot_id)
+            think(s["thinktime"])
+            validate_data(uri, service_name)
+            delete_snapshot(uri, service_name, header, snapshot_id)
 
-              load_data(uri, service_name, s["load"])
-              take_snapshot(uri, service_name, header)
-              think(s["thinktime"])
+            load_data(uri, service_name, s["load"])
+            take_snapshot(uri, service_name, header)
+            think(s["thinktime"])
 
-              if s["import_from_url"]
-                snapshots = list_snapshot(uri, service_name, header)
-                if has_snapshot?(snapshots)
-                  snapshot_id = random_snapshot(snapshots)
+            if s["import_from_url"]
+              snapshots = list_snapshot(uri, service_name, header)
+              if has_snapshot?(snapshots)
+                snapshot_id = random_snapshot(snapshots)
 
-                  result, _ = import_from_url(uri, service_name, header, snapshot_id)
-                  if result == "pass"
-                    think(s["thinktime"])
-                    validate_data(uri, service_name)
-                    load_data(uri, service_name, s["load"])
-                    think(s["thinktime"])
-                    delete_snapshot(uri, service_name, header, snapshot_id)
-                    think(s["thinktime"])
-                  end
+                result, _ = import_from_url(uri, service_name, header, snapshot_id)
+                if result == "pass"
+                  think(s["thinktime"])
+                  validate_data(uri, service_name)
+                  load_data(uri, service_name, s["load"])
+                  think(s["thinktime"])
+                  delete_snapshot(uri, service_name, header, snapshot_id)
+                  think(s["thinktime"])
                 end
               end
+            end
 
-              if s["import_from_data"]
-                snapshots = list_snapshot(uri, service_name, header)
-                if has_snapshot?(snapshots)
-                  snapshot_id = random_snapshot(snapshots)
+            if s["import_from_data"]
+              snapshots = list_snapshot(uri, service_name, header)
+              if has_snapshot?(snapshots)
+                snapshot_id = random_snapshot(snapshots)
 
-                  result = import_from_data(uri, service_name, header, snapshot_id)
-                  if result == "pass"
-                    validate_data(uri, service_name)
-                    think(s["thinktime"])
-                    load_data(uri, service_name, s["load"])
-                    think(s["thinktime"])
-                    delete_snapshot(uri, service_name, header, snapshot_id)
-                    think(s["thinktime"])
-                  end
+                result = import_from_data(uri, service_name, header, snapshot_id)
+                if result == "pass"
+                  validate_data(uri, service_name)
+                  think(s["thinktime"])
+                  load_data(uri, service_name, s["load"])
+                  think(s["thinktime"])
+                  delete_snapshot(uri, service_name, header, snapshot_id)
+                  think(s["thinktime"])
                 end
               end
             end

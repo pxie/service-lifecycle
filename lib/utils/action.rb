@@ -133,21 +133,18 @@ module Utils
       begin
         puts "validate snapshot. url: #{url}"
         $log.info("validate snapshot. url: #{url}, service: #{service}")
-        timeout = 10 * 60 * 60 # wait 5 hrs
-        sleep_time = 30
-        while timeout > 0
-          sleep(sleep_time)
-          timeout -= sleep_time
 
-          response = RestClient.post(url, "", header)
-          $log.debug("response: #{response.code}, body: #{response.body}")
-          if response.code == 200
-            snapshots = JSON.parse(response.body)
-            $log.debug("snapshots length: #{snapshots["snapshots"].length}, totalnum: #{totalnum}")
-            break if snapshots["snapshots"].length >= totalnum
+        response = RestClient.post(url, "", header)
+        $log.debug("response: #{response.code}, body: #{response.body}")
+        if response.code == 200
+          snapshots = JSON.parse(response.body)
+          $log.debug("snapshots length: #{snapshots["snapshots"].length}, totalnum: #{totalnum}")
+          if snapshots["snapshots"].length == totalnum
+            result = "pass"
+          else
+            result = "fail"
           end
         end
-        result = "fail" unless timeout > 0
       rescue Exception => e
         $log.error("fail to list snapshot. url: #{url}, service: #{service}\n#{e.inspect}")
         result = "fail"
