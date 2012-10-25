@@ -118,11 +118,14 @@ load_config.each do |scenario, details|
     sleep(2)
   end
   threads.each { |t| t.join }
+
   duration = Time.now - now
   puts "prepare results"
   puts "testing execution duration: #{duration / 60.0 / 60.0} hours"
   $log.info("testing execution duration: #{duration / 60.0 / 60.0} hours")
   print_result
 end
+
+
 
 
